@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 
 
 def get_project_root() -> Path:
-    """Get the project root directory"""
     return Path(__file__).resolve().parent.parent
 
 
@@ -17,112 +16,71 @@ WORKSPACE_ROOT = PROJECT_ROOT / "workspace"
 
 
 class LLMSettings(BaseModel):
-    model: str = Field(..., description="Model name")
-    base_url: str = Field(..., description="API base URL")
-    api_key: str = Field(..., description="API key")
-    max_tokens: int = Field(4096, description="Maximum number of tokens per request")
-    max_input_tokens: Optional[int] = Field(
-        None,
-        description="Maximum input tokens to use across all requests (None for unlimited)",
-    )
-    temperature: float = Field(1.0, description="Sampling temperature")
-    api_type: str = Field(..., description="Azure, Openai, or Ollama")
-    api_version: str = Field(..., description="Azure Openai version if AzureOpenai")
+    model: str = Field(...)
+    base_url: str = Field(...)
+    api_key: str = Field(...)
+    max_tokens: int = Field(4096)
+    max_input_tokens: Optional[int] = Field(None)
+    temperature: float = Field(1.0)
+    api_type: str = Field("openai")
+    api_version: Optional[str] = Field(None)
+    endpoint_id: Optional[str] = Field(None)
+    timeout: int = Field(120)
+    retry_count: int = Field(3)
+    streaming_supported: bool = Field(True)
 
 
 class ProxySettings(BaseModel):
-    server: str = Field(None, description="Proxy server address")
-    username: Optional[str] = Field(None, description="Proxy username")
-    password: Optional[str] = Field(None, description="Proxy password")
+    server: str = Field(None)
+    username: Optional[str] = Field(None)
+    password: Optional[str] = Field(None)
 
 
 class SearchSettings(BaseModel):
-    engine: str = Field(default="Google", description="Search engine the llm to use")
+    engine: str = Field(default="Google")
     fallback_engines: List[str] = Field(
-        default_factory=lambda: ["DuckDuckGo", "Baidu", "Bing"],
-        description="Fallback search engines to try if the primary engine fails",
+        default_factory=lambda: ["DuckDuckGo", "Baidu", "Bing"]
     )
-    retry_delay: int = Field(
-        default=60,
-        description="Seconds to wait before retrying all engines again after they all fail",
-    )
-    max_retries: int = Field(
-        default=3,
-        description="Maximum number of times to retry all engines when all fail",
-    )
-    lang: str = Field(
-        default="en",
-        description="Language code for search results (e.g., en, zh, fr)",
-    )
-    country: str = Field(
-        default="us",
-        description="Country code for search results (e.g., us, cn, uk)",
-    )
+    retry_delay: int = Field(default=60)
+    max_retries: int = Field(default=3)
+    lang: str = Field(default="en")
+    country: str = Field(default="us")
 
 
 class BrowserSettings(BaseModel):
-    headless: bool = Field(False, description="Whether to run browser in headless mode")
-    disable_security: bool = Field(
-        True, description="Disable browser security features"
-    )
-    extra_chromium_args: List[str] = Field(
-        default_factory=list, description="Extra arguments to pass to the browser"
-    )
-    chrome_instance_path: Optional[str] = Field(
-        None, description="Path to a Chrome instance to use"
-    )
-    wss_url: Optional[str] = Field(
-        None, description="Connect to a browser instance via WebSocket"
-    )
-    cdp_url: Optional[str] = Field(
-        None, description="Connect to a browser instance via CDP"
-    )
-    proxy: Optional[ProxySettings] = Field(
-        None, description="Proxy settings for the browser"
-    )
-    max_content_length: int = Field(
-        2000, description="Maximum length for content retrieval operations"
-    )
+    headless: bool = Field(False)
+    disable_security: bool = Field(True)
+    extra_chromium_args: List[str] = Field(default_factory=list)
+    chrome_instance_path: Optional[str] = Field(None)
+    wss_url: Optional[str] = Field(None)
+    cdp_url: Optional[str] = Field(None)
+    proxy: Optional[ProxySettings] = Field(None)
+    max_content_length: int = Field(2000)
 
 
 class SandboxSettings(BaseModel):
-    """Configuration for the execution sandbox"""
-
-    use_sandbox: bool = Field(False, description="Whether to use the sandbox")
-    image: str = Field("python:3.12-slim", description="Base image")
-    work_dir: str = Field("/workspace", description="Container working directory")
-    memory_limit: str = Field("512m", description="Memory limit")
-    cpu_limit: float = Field(1.0, description="CPU limit")
-    timeout: int = Field(300, description="Default command timeout (seconds)")
-    network_enabled: bool = Field(
-        False, description="Whether network access is allowed"
-    )
+    use_sandbox: bool = Field(False)
+    image: str = Field("python:3.12-slim")
+    work_dir: str = Field("/workspace")
+    memory_limit: str = Field("512m")
+    cpu_limit: float = Field(1.0)
+    timeout: int = Field(300)
+    network_enabled: bool = Field(False)
 
 
 class MCPServerConfig(BaseModel):
-    """Configuration for a single MCP server"""
-
-    type: str = Field(..., description="Server connection type (sse or stdio)")
-    url: Optional[str] = Field(None, description="Server URL for SSE connections")
-    command: Optional[str] = Field(None, description="Command for stdio connections")
-    args: List[str] = Field(
-        default_factory=list, description="Arguments for stdio command"
-    )
+    type: str = Field(...)
+    url: Optional[str] = Field(None)
+    command: Optional[str] = Field(None)
+    args: List[str] = Field(default_factory=list)
 
 
 class MCPSettings(BaseModel):
-    """Configuration for MCP (Model Context Protocol)"""
-
-    server_reference: str = Field(
-        "app.mcp.server", description="Module reference for the MCP server"
-    )
-    servers: Dict[str, MCPServerConfig] = Field(
-        default_factory=dict, description="MCP server configurations"
-    )
+    server_reference: str = Field("app.mcp.server")
+    servers: Dict[str, MCPServerConfig] = Field(default_factory=dict)
 
     @classmethod
     def load_server_config(cls) -> Dict[str, MCPServerConfig]:
-        """Load MCP server configuration from JSON file"""
         config_path = PROJECT_ROOT / "config" / "mcp.json"
 
         try:
@@ -148,16 +106,10 @@ class MCPSettings(BaseModel):
 
 class AppConfig(BaseModel):
     llm: Dict[str, LLMSettings]
-    sandbox: Optional[SandboxSettings] = Field(
-        None, description="Sandbox configuration"
-    )
-    browser_config: Optional[BrowserSettings] = Field(
-        None, description="Browser configuration"
-    )
-    search_config: Optional[SearchSettings] = Field(
-        None, description="Search configuration"
-    )
-    mcp_config: Optional[MCPSettings] = Field(None, description="MCP configuration")
+    sandbox: Optional[SandboxSettings] = Field(None)
+    browser_config: Optional[BrowserSettings] = Field(None)
+    search_config: Optional[SearchSettings] = Field(None)
+    mcp_config: Optional[MCPSettings] = Field(None)
 
     class Config:
         arbitrary_types_allowed = True
@@ -213,16 +165,18 @@ class Config:
             "max_tokens": base_llm.get("max_tokens", 4096),
             "max_input_tokens": base_llm.get("max_input_tokens"),
             "temperature": base_llm.get("temperature", 1.0),
-            "api_type": base_llm.get("api_type", ""),
-            "api_version": base_llm.get("api_version", ""),
+            "api_type": base_llm.get("api_type", "openai"),
+            "api_version": base_llm.get("api_version"),
+            "endpoint_id": base_llm.get("endpoint_id"),
+            "timeout": base_llm.get("timeout", 120),
+            "retry_count": base_llm.get("retry_count", 3),
+            "streaming_supported": base_llm.get("streaming_supported", True),
         }
 
-        # handle browser config.
         browser_config = raw_config.get("browser", {})
         browser_settings = None
 
         if browser_config:
-            # handle proxy settings.
             proxy_config = browser_config.get("proxy", {})
             proxy_settings = None
 
@@ -235,18 +189,15 @@ class Config:
                     }
                 )
 
-            # filter valid browser config parameters.
             valid_browser_params = {
                 k: v
                 for k, v in browser_config.items()
                 if k in BrowserSettings.__annotations__ and v is not None
             }
 
-            # if there is proxy settings, add it to the parameters.
             if proxy_settings:
                 valid_browser_params["proxy"] = proxy_settings
 
-            # only create BrowserSettings when there are valid parameters.
             if valid_browser_params:
                 browser_settings = BrowserSettings(**valid_browser_params)
 
@@ -263,7 +214,6 @@ class Config:
         mcp_config = raw_config.get("mcp", {})
         mcp_settings = None
         if mcp_config:
-            # Load server configurations from JSON
             mcp_config["servers"] = MCPSettings.load_server_config()
             mcp_settings = MCPSettings(**mcp_config)
         else:
@@ -303,17 +253,14 @@ class Config:
 
     @property
     def mcp_config(self) -> MCPSettings:
-        """Get the MCP configuration"""
         return self._config.mcp_config
 
     @property
     def workspace_root(self) -> Path:
-        """Get the workspace root directory"""
         return WORKSPACE_ROOT
 
     @property
     def root_path(self) -> Path:
-        """Get the root path of the application"""
         return PROJECT_ROOT
 
 
