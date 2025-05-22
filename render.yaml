@@ -1,0 +1,53 @@
+services:
+  - type: web
+    name: OpenAgentFramework
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -k uvicorn.workers.UvicornWorker -b 0.0.0.0:$PORT app.api.main:app --workers 4
+    envVars:
+      - key: ENV
+        value: production
+      - key: PORT
+        value: 8000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: OpenAgentFramework-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: LOG_LEVEL
+        value: INFO
+      - key: ALLOW_ADMIN_REGISTRATION
+        value: "False"
+      - key: FRONTEND_URL
+        value: "https://your-frontend-url.com"
+      # RunPod Configuration
+      - key: RUNPOD_API_KEY
+        sync: false
+      - key: RUNPOD_BASE_URL
+        sync: false
+      - key: LLM_API_TYPE
+        value: "runpod"
+      - key: LLM_MODEL
+        value: "agent-model"
+      - key: LLM_TEMPERATURE
+        value: "0.7"
+      - key: LLM_MAX_TOKENS
+        value: "4096"
+      # Workspace Configuration
+      - key: WORKSPACE_ROOT
+        value: "/app/OpenManus/workspace"
+      # Browser Configuration
+      - key: BROWSER_HEADLESS
+        value: "true"
+      - key: BROWSER_DISABLE_SECURITY
+        value: "true"
+
+databases:
+  - name: OpenAgentFramework-db
+    plan: starter
+    ipAllowList: []

@@ -1,10 +1,11 @@
 import json
 import threading
 import tomllib
+import os
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 
 def get_project_root() -> Path:
@@ -12,7 +13,7 @@ def get_project_root() -> Path:
 
 
 PROJECT_ROOT = get_project_root()
-WORKSPACE_ROOT = PROJECT_ROOT / "workspace"
+WORKSPACE_ROOT = Path(os.environ.get("WORKSPACE_ROOT", PROJECT_ROOT / "workspace"))
 
 
 class LLMSettings(BaseModel):
@@ -104,12 +105,49 @@ class MCPSettings(BaseModel):
             raise ValueError(f"Failed to load MCP server config: {e}")
 
 
+class AuthSettings(BaseModel):
+    # Security settings
+    SECRET_KEY: str = Field(default_factory=lambda: os.environ.get("SECRET_KEY", os.urandom(24).hex()))
+    ADMIN_USERNAME: str = Field(default=os.environ.get("ADMIN_USERNAME", "admin"))
+    ADMIN_PASSWORD: str = Field(default=os.environ.get("ADMIN_PASSWORD", ""))
+    
+    # JWT Authentication settings
+    JWT_ALGORITHM: str = Field(default=os.environ.get("JWT_ALGORITHM", "HS256"))
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=int(os.environ.get("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "1440")))
+    ALLOW_ADMIN_REGISTRATION: bool = Field(default=os.environ.get("ALLOW_ADMIN_REGISTRATION", "False").lower() == "true")
+    
+    # Email settings for password reset
+    SMTP_HOST: Optional[str] = Field(default=os.environ.get("SMTP_HOST"))
+    SMTP_PORT: Optional[int] = Field(default=int(os.environ.get("SMTP_PORT", "587")) if os.environ.get("SMTP_PORT") else None)
+    SMTP_USERNAME: Optional[str] = Field(default=os.environ.get("SMTP_USERNAME"))
+    SMTP_PASSWORD: Optional[str] = Field(default=os.environ.get("SMTP_PASSWORD"))
+    SMTP_USE_TLS: bool = Field(default=os.environ.get("SMTP_USE_TLS", "True").lower() == "true")
+    EMAIL_FROM: str = Field(default=os.environ.get("EMAIL_FROM", "noreply@openagentframework.com"))
+    FRONTEND_URL: str = Field(default=os.environ.get("FRONTEND_URL", "http://localhost:3000"))
+    
+    # Database settings
+    DATABASE_URL: str = Field(default=os.environ.get("DATABASE_URL", ""))
+    
+    @validator("DATABASE_URL")
+    def validate_database_url(cls, v):
+        if not v and os.environ.get("ENV") == "production":
+            raise ValueError("DATABASE_URL must be set in production environment")
+        return v
+    
+    @validator("ADMIN_PASSWORD")
+    def validate_admin_password(cls, v, values):
+        if os.environ.get("ENV") == "production" and not v:
+            raise ValueError("ADMIN_PASSWORD must be set in production environment")
+        return v
+
+
 class AppConfig(BaseModel):
     llm: Dict[str, LLMSettings]
     sandbox: Optional[SandboxSettings] = Field(None)
     browser_config: Optional[BrowserSettings] = Field(None)
     search_config: Optional[SearchSettings] = Field(None)
     mcp_config: Optional[MCPSettings] = Field(None)
+    auth: AuthSettings = Field(default_factory=AuthSettings)
 
     class Config:
         arbitrary_types_allowed = True
@@ -219,6 +257,9 @@ class Config:
         else:
             mcp_settings = MCPSettings(servers=MCPSettings.load_server_config())
 
+        # Add auth settings
+        auth_settings = AuthSettings()
+
         config_dict = {
             "llm": {
                 "default": default_settings,
@@ -231,6 +272,7 @@ class Config:
             "browser_config": browser_settings,
             "search_config": search_settings,
             "mcp_config": mcp_settings,
+            "auth": auth_settings,
         }
 
         self._config = AppConfig(**config_dict)
@@ -254,6 +296,10 @@ class Config:
     @property
     def mcp_config(self) -> MCPSettings:
         return self._config.mcp_config
+    
+    @property
+    def auth(self) -> AuthSettings:
+        return self._config.auth
 
     @property
     def workspace_root(self) -> Path:
@@ -262,6 +308,43 @@ class Config:
     @property
     def root_path(self) -> Path:
         return PROJECT_ROOT
+    
+    # Auth-specific properties for compatibility
+    @property
+    def SECRET_KEY(self) -> str:
+        return self.auth.SECRET_KEY
+    
+    @property
+    def DATABASE_URL(self) -> str:
+        return self.auth.DATABASE_URL
+    
+    @property
+    def SMTP_HOST(self) -> Optional[str]:
+        return self.auth.SMTP_HOST
+    
+    @property
+    def SMTP_PORT(self) -> Optional[int]:
+        return self.auth.SMTP_PORT
+    
+    @property
+    def SMTP_USERNAME(self) -> Optional[str]:
+        return self.auth.SMTP_USERNAME
+    
+    @property
+    def SMTP_PASSWORD(self) -> Optional[str]:
+        return self.auth.SMTP_PASSWORD
+    
+    @property
+    def EMAIL_FROM(self) -> str:
+        return self.auth.EMAIL_FROM
+    
+    @property
+    def FRONTEND_URL(self) -> str:
+        return self.auth.FRONTEND_URL
+    
+    @property
+    def DEBUG(self) -> bool:
+        return os.environ.get("DEBUG", "False").lower() == "true"
 
 
 config = Config()
