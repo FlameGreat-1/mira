@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: OpenAgentFramework
+    name: Mira
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn -k uvicorn.workers.UvicornWorker -b 0.0.0.0:$PORT app.api.main:app --workers 4
@@ -24,7 +24,7 @@ services:
       - key: ALLOW_ADMIN_REGISTRATION
         value: "False"
       - key: FRONTEND_URL
-        value: "https://your-frontend-url.com"
+        value: "https://voxchat.onrender.com"
       # RunPod Configuration
       - key: RUNPOD_API_KEY
         sync: false
