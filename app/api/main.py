@@ -16,7 +16,11 @@ from app.logger import logger
 from app.api.auth.router import router as auth_router
 from app.db.repository import init_db
 
-app = FastAPI(title="OpenAgentFramework API")
+app = FastAPI(
+    title="OpenAgentFramework API",
+    docs_url="/",  
+    redoc_url="/redoc" 
+)
 
 # Add CORS middleware
 app.add_middleware(
