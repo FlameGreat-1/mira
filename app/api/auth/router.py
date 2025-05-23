@@ -11,6 +11,12 @@ from app.auth.jwt_handler import generate_token
 from app.auth.email import send_reset_email
 from app.logger import logger
 from app.config import config
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+from app.auth.jwt_handler import verify_token
+
+security = HTTPBearer()
 
 # Create router
 router = APIRouter()
@@ -168,3 +174,31 @@ async def reset_password(request: ResetPasswordRequest):
     except Exception as e:
         logger.error(f"Error in reset password: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Get the current authenticated user from the JWT token
+    """
+    try:
+        # Verify the token
+        payload = verify_token(credentials.credentials)
+        
+        if not payload:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            
+        # Return the user data from the token
+        return {
+            "id": payload.get("user_id"),
+            "username": payload.get("username"),
+            "role": payload.get("role", "user")
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Authentication error: {str(e)}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
