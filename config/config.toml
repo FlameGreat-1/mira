@@ -1,24 +1,21 @@
-# config/config.toml
-
 # Default LLM configuration (RunPod)
 [llm]
 api_type = "runpod"
 model = "agent-model"
-base_url = "https://your-runpod-endpoint.runpod.net"
-api_key = "your-runpod-api-key"
+base_url = "http://localhost:8888"  # Will be used with SSH tunnel
+api_key = ""  # Will be provided by environment variable
 max_tokens = 4096
 temperature = 0.7
 timeout = 120  # Connection timeout in seconds
 retry_count = 3  
 streaming_supported = true  
-endpoint_id = "your-endpoint-id"  
 
 # Vision model configuration (RunPod)
 [llm.vision]
 api_type = "runpod"
-model = "agent-model-vision"
-base_url = "https://your-runpod-endpoint.runpod.net"
-api_key = "your-runpod-api-key"
+model = "agent-model"
+base_url = "http://localhost:8888"  # Will be used with SSH tunnel
+api_key = ""  # Will be provided by environment variable
 max_tokens = 4096
 temperature = 0.7
 
@@ -27,7 +24,7 @@ temperature = 0.7
 api_type = "openai"
 model = "gpt-4o"
 base_url = "https://api.openai.com/v1"
-api_key = "your-openai-api-key"
+api_key = ""  # Will be provided by environment variable
 max_tokens = 4096
 temperature = 0.7
 
@@ -35,8 +32,8 @@ temperature = 0.7
 [llm.azure]
 api_type = "azure"
 model = "gpt-4"
-base_url = "https://your-azure-endpoint.openai.azure.com/openai/deployments/your-deployment-id"
-api_key = "your-azure-api-key"
+base_url = ""  # Will be provided by environment variable
+api_key = ""  # Will be provided by environment variable
 api_version = "2024-02-01"
 max_tokens = 4096
 temperature = 0.7
@@ -46,13 +43,13 @@ temperature = 0.7
 api_type = "anthropic"
 model = "claude-3-sonnet-20240229"
 base_url = "https://api.anthropic.com/v1"
-api_key = "your-anthropic-api-key"
+api_key = ""  # Will be provided by environment variable
 max_tokens = 4096
 temperature = 0.7
 
 # Browser configuration
 [browser]
-headless = false
+headless = true
 disable_security = true
 extra_chromium_args = []
 max_content_length = 2000
@@ -71,10 +68,10 @@ country = "us"
 use_sandbox = false
 image = "python:3.12-slim"
 work_dir = "/workspace"
-memory_limit = "1g"
-cpu_limit = 2.0
+memory_limit = "512m"
+cpu_limit = 1.0
 timeout = 300
-network_enabled = true
+network_enabled = false
 
 # MCP configuration
 [mcp]
