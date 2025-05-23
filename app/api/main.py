@@ -267,7 +267,7 @@ def health_check():
         "status": "healthy", 
         "version": "1.0.0",
         "config": {
-            "llm_type": config.llm_config.api_type,
+            "llm_type": config.llm['default'].api_type if 'default' in config.llm else "unknown",
             "workspace": config.workspace_root,
             "tools_count": len(config.tool_config.enabled_tools)
         }
