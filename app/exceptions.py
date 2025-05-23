@@ -11,3 +11,7 @@ class OpenManusError(Exception):
 
 class TokenLimitExceeded(OpenManusError):
     """Exception raised when the token limit is exceeded"""
+    
+class LLMError(Exception):
+    """Exception raised for errors in the LLM module."""
+    pass
