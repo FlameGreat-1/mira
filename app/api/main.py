@@ -259,6 +259,18 @@ async def list_files(current_user: dict = Depends(get_current_user)):
     except Exception as e:
         logger.error(f"Error listing files: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+        
+@app.get("/health")
+def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy", 
+        "version": "1.0.0",
+        "config": {
+            "llm_type": config.llm['default'].api_type if 'default' in config.llm else "unknown",
+            "workspace": str(config.workspace_root),
+        }
+    }
 
 @app.get("/health")
 def health_check():
@@ -274,7 +286,6 @@ def health_check():
     }
 
 # Startup and shutdown events
-@app.on_event("startup")
 async def startup_event():
     logger.info("Starting OpenAgentFramework API")
     
@@ -285,9 +296,12 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Database initialization error: {str(e)}")
     
-    # Log configuration
-    logger.info(f"LLM Provider: {config.llm['default'].api_type if 'default' in config.llm else 'unknown'}")
-    logger.info(f"Workspace: {config.workspace_root}")
+    # Log configuration with safe access
+    try:
+        logger.info(f"LLM Provider: {config.llm['default'].api_type if 'default' in config.llm else 'unknown'}")
+        logger.info(f"Workspace: {config.workspace_root}")
+    except Exception as e:
+        logger.error(f"Error logging configuration: {str(e)}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
