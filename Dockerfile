@@ -1,6 +1,7 @@
 FROM python:3.12-slim
 
-WORKDIR /app/OpenManus
+# Change from /app/OpenManus to /app
+WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -36,8 +37,8 @@ RUN uv pip install --system fastapi uvicorn gunicorn psycopg2-binary PyJWT Jinja
 # Create necessary directories for authentication
 RUN mkdir -p logs templates/email
 
-# Set environment variables
-ENV PYTHONPATH=/app/OpenManus
+# Update PYTHONPATH to use /app instead of /app/OpenManus
+ENV PYTHONPATH=/app
 ENV PORT=8000
 
 # Expose port
