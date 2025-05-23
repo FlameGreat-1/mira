@@ -286,7 +286,7 @@ async def startup_event():
         logger.error(f"Database initialization error: {str(e)}")
     
     # Log configuration
-    logger.info(f"LLM Provider: {config.llm['default'].api_type}")
+    logger.info(f"LLM Provider: {config.llm['default'].api_type if 'default' in config.llm else 'unknown'}")
     logger.info(f"Workspace: {config.workspace_root}")
 
 @app.on_event("shutdown")
