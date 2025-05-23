@@ -348,8 +348,8 @@ class LLM:
 
             if not self.streaming_supported and self.api_type == "runpod":
                 logger.warning("Streaming not supported for RunPod, falling back to non-streaming request")
-                response = await self.client.chat.completions.create(
-                    **params, stream=False
+                response = await self.client.chat.create(**params, stream=False
+                
                 )
 
                 if not response.choices or not response.choices[0].message.content:
@@ -503,9 +503,10 @@ class LLM:
                 )
 
             params["stream"] = False  # Always use non-streaming for tool requests
-            response: ChatCompletion = await self.client.chat.completions.create(
-                **params
-            )
+            if self.api_type == "runpod":
+               response: ChatCompletion = await self.client.chat.create(**params)
+            else:
+               response: ChatCompletion = await self.client.chat.completions.create(**params)
 
             # Check if response is valid
             if not response.choices or not response.choices[0].message:
