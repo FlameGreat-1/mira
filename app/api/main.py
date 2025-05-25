@@ -290,6 +290,7 @@ def health_check():
     }
 
 # Startup and shutdown events
+@app.on_event("startup")
 async def startup_event():
     logger.info("Starting OpenAgentFramework API")
     
