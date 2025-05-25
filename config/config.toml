@@ -2,7 +2,7 @@
 [llm]
 api_type = "runpod"
 model = "agent-model"
-base_url = "http://localhost:8888"  # Will be used with SSH tunnel
+base_url = "https://alhgtq3p5oelru-8888.proxy.runpod.net"  # Use proxy URL
 api_key = ""  # Will be provided by environment variable
 max_tokens = 4096
 temperature = 0.7
@@ -14,7 +14,7 @@ streaming_supported = true
 [llm.vision]
 api_type = "runpod"
 model = "agent-model"
-base_url = "http://localhost:8888"  # Will be used with SSH tunnel
+base_url = "https://alhgtq3p5oelru-8888.proxy.runpod.net" 
 api_key = ""  # Will be provided by environment variable
 max_tokens = 4096
 temperature = 0.7
