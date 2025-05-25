@@ -32,7 +32,8 @@ curl -X POST https://mira-0gn4.onrender.com/auth/login \
 ```
 Save the token from the response:
 ```
-TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+set TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiZGJiOGE2N2QtNzY5NC00YzU1LWI5YzQtMzkxMzE0YzcyYTFlIiwidXNlcm5hbWUiOiJtaXJhdXNlciIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzQ4MjU1MTAwfQ.gyv0wTyG4ApnUzkEHv7gOvaPcBsYsB77ZNs-IHS3R9Y
+
 ```
 
 ### 3. Request a password reset
