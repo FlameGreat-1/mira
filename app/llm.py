@@ -454,24 +454,19 @@ class LLM:
             Exception: For unexpected errors
         """
         try:
-            # Validate tool_choice
             if tool_choice not in TOOL_CHOICE_VALUES:
                 raise ValueError(f"Invalid tool_choice: {tool_choice}")
 
-            # Check if the model supports images
             supports_images = self.model in MULTIMODAL_MODELS
 
-            # Format messages
             if system_msgs:
                 system_msgs = self.format_messages(system_msgs, supports_images)
                 messages = system_msgs + self.format_messages(messages, supports_images)
             else:
                 messages = self.format_messages(messages, supports_images)
 
-            # Calculate input token count
             input_tokens = self.count_message_tokens(messages)
 
-            # If there are tools, calculate token count for tool descriptions
             tools_tokens = 0
             if tools:
                 for tool in tools:
@@ -479,19 +474,15 @@ class LLM:
 
             input_tokens += tools_tokens
 
-            # Check if token limits are exceeded
             if not self.check_token_limit(input_tokens):
                 error_message = self.get_limit_error_message(input_tokens)
-                # Raise a special exception that won't be retried
                 raise TokenLimitExceeded(error_message)
 
-            # Validate tools if provided
             if tools:
                 for tool in tools:
                     if not isinstance(tool, dict) or "type" not in tool:
                         raise ValueError("Each tool must be a dict with 'type' field")
 
-            # Set up the completion request
             params = {
                 "model": self.model,
                 "messages": messages,
@@ -509,27 +500,71 @@ class LLM:
                     temperature if temperature is not None else self.temperature
                 )
 
-            params["stream"] = False  # Always use non-streaming for tool requests
+            params["stream"] = False
+
             if self.api_type == "runpod":
-               response: ChatCompletion = await self.client.chat.create(**params)
+                response = await self.client.chat.create(**params)
+
+                if isinstance(response, dict):
+                    from dataclasses import dataclass, field
+
+                    @dataclass
+                    class MockToolCall:
+                        id: str
+                        type: str = "function"
+                        function: dict = field(default_factory=dict)
+
+                    @dataclass
+                    class MockMessage:
+                        content: str
+                        role: str = "assistant"
+                        tool_calls: List[MockToolCall] = None
+
+                    @dataclass
+                    class MockUsage:
+                        prompt_tokens: int
+                        completion_tokens: int
+                        total_tokens: int
+
+                    content = response.get("text", "")
+
+                    tool_calls_data = response.get("tool_calls", [])
+                    tool_calls = None
+                    if tool_calls_data:
+                        tool_calls = []
+                        for tc in tool_calls_data:
+                            tool_calls.append(MockToolCall(
+                                id=tc.get("id", f"call_{int(time.time())}"),
+                                function={
+                                    "name": tc.get("name", ""),
+                                    "arguments": tc.get("arguments", "{}")
+                                }
+                            ))
+
+                    message = MockMessage(content=content, tool_calls=tool_calls)
+
+                    usage = MockUsage(
+                        prompt_tokens=response.get("usage", {}).get("prompt_tokens", 0),
+                        completion_tokens=response.get("usage", {}).get("completion_tokens", 0),
+                        total_tokens=response.get("usage", {}).get("total_tokens", 0)
+                    )
+
+                    self.update_token_count(usage.prompt_tokens, usage.completion_tokens)
+
+                    return message
             else:
-               response: ChatCompletion = await self.client.chat.completions.create(**params)
+                response = await self.client.chat.completions.create(**params)
 
-            # Check if response is valid
-            if not response.choices or not response.choices[0].message:
-                print(response)
-                # raise ValueError("Invalid or empty response from LLM")
-                return None
+                if not response.choices or not response.choices[0].message:
+                    return None
 
-            # Update token counts
-            self.update_token_count(
-                response.usage.prompt_tokens, response.usage.completion_tokens
-            )
+                self.update_token_count(
+                    response.usage.prompt_tokens, response.usage.completion_tokens
+                )
 
-            return response.choices[0].message
+                return response.choices[0].message
 
         except TokenLimitExceeded:
-            # Re-raise token limit errors without logging
             raise
         except ValueError as ve:
             logger.error(f"Validation error in ask_tool: {ve}")
