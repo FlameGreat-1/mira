@@ -504,15 +504,21 @@ class LLM:
 
             if self.api_type == "runpod":
                 response = await self.client.chat.create(**params)
+                logger.debug(f"Raw RunPod response: {json.dumps(response)}")
 
                 if isinstance(response, dict):
                     from dataclasses import dataclass, field
 
                     @dataclass
+                    class MockFunction:
+                        name: str
+                        arguments: str
+
+                    @dataclass
                     class MockToolCall:
                         id: str
                         type: str = "function"
-                        function: dict = field(default_factory=dict)
+                        function: MockFunction = None
 
                     @dataclass
                     class MockMessage:
@@ -535,10 +541,10 @@ class LLM:
                         for tc in tool_calls_data:
                             tool_calls.append(MockToolCall(
                                 id=tc.get("id", f"call_{int(time.time())}"),
-                                function={
-                                    "name": tc.get("name", ""),
-                                    "arguments": tc.get("arguments", "{}")
-                                }
+                                function=MockFunction(
+                                    name=tc.get("name", ""),
+                                    arguments=tc.get("arguments", "{}")
+                                )
                             ))
 
                     message = MockMessage(content=content, tool_calls=tool_calls)
@@ -581,3 +587,4 @@ class LLM:
         except Exception as e:
             logger.error(f"Unexpected error in ask_tool: {e}")
             raise
+

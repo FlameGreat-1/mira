@@ -257,3 +257,23 @@ curl -X POST https://mira-0gn4.onrender.com/api/chat -H "Content-Type: applicati
 The Agent Framework is configured to communicate with the RunPod AI service at `https://alhgtq3p5oelru-8888.proxy.runpod.net` using API key `7f8e9d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8`.
 
 All API requests (except health check) require authentication with a valid JWT token obtained from the login endpoint.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
