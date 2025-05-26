@@ -1,3 +1,4 @@
+import os
 import math
 from typing import Dict, List, Optional, Union
 
@@ -163,7 +164,13 @@ class LLM:
             self.max_tokens = llm_config.max_tokens
             self.temperature = llm_config.temperature
             self.api_type = llm_config.api_type
+
             self.api_key = llm_config.api_key
+            if not self.api_key and self.api_type == "runpod":
+                self.api_key = os.environ.get("RUNPOD_API_KEY") or os.environ.get("API_KEY")
+                if not self.api_key:
+                    logger.warning("No API key found for RunPod client")
+
             self.api_version = llm_config.api_version
             self.base_url = llm_config.base_url
             self.timeout = getattr(llm_config, "timeout", 120)
@@ -349,7 +356,7 @@ class LLM:
             if not self.streaming_supported and self.api_type == "runpod":
                 logger.warning("Streaming not supported for RunPod, falling back to non-streaming request")
                 response = await self.client.chat.create(**params, stream=False
-                
+
                 )
 
                 if not response.choices or not response.choices[0].message.content:
