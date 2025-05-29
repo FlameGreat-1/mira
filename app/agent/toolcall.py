@@ -64,22 +64,21 @@ class ToolCallAgent(ReActAgent):
                 logger.debug(f"📝 Raw RunPod response type: {type(response)}")
                 logger.debug(f"📝 Raw RunPod response: {response}")
                 
-                # Extract content based on response type
-                content = ""
+                # Use the response directly instead of trying to extract content
                 if response:
-                    if hasattr(response, 'content') and response.content:
-                        content = response.content
-                    elif hasattr(response, 'text') and response.text:
-                        content = response.text
-                    elif isinstance(response, dict):
-                        content = response.get('text', response.get('content', ''))
-                    elif isinstance(response, str):
-                        content = response
-                
-                logger.info(f"✨ {self.name}'s direct response from RunPod: {content[:100]}..." if content else "✨ No content extracted from RunPod response")
-                
-                if content:
-                    self.memory.add_message(Message.assistant_message(content))
+                    # Convert response to string if it's not already
+                    if not isinstance(response, str):
+                        if hasattr(response, '__str__'):
+                            response_str = str(response)
+                        elif isinstance(response, dict):
+                            response_str = json.dumps(response)
+                        else:
+                            response_str = f"Response: {response}"
+                    else:
+                        response_str = response
+                    
+                    logger.info(f"✨ Direct response from RunPod: {response_str[:100]}...")
+                    self.memory.add_message(Message.assistant_message(response_str))
                     self.state = AgentState.FINISHED
                     logger.info("✅ RunPod response processed successfully, agent finished")
                     return True
