@@ -35,7 +35,7 @@ class ToolCallAgent(ReActAgent):
 
     max_steps: int = 30
     max_observe: Optional[Union[int, bool]] = None
-
+    
     async def think(self) -> bool:
         """Process current state and decide next actions using tools"""
         if self.next_step_prompt:
@@ -64,26 +64,23 @@ class ToolCallAgent(ReActAgent):
                 logger.debug(f"📝 Raw RunPod response type: {type(response)}")
                 logger.debug(f"📝 Raw RunPod response: {response}")
                 
-                # Use the response directly instead of trying to extract content
-                if response:
-                    # Convert response to string if it's not already
-                    if not isinstance(response, str):
-                        if hasattr(response, '__str__'):
-                            response_str = str(response)
-                        elif isinstance(response, dict):
-                            response_str = json.dumps(response)
-                        else:
-                            response_str = f"Response: {response}"
-                    else:
-                        response_str = response
-                    
-                    logger.info(f"✨ Direct response from RunPod: {response_str[:100]}...")
-                    self.memory.add_message(Message.assistant_message(response_str))
+                # Extract content from the OpenAI-compatible response format
+                content = ""
+                if isinstance(response, dict):
+                    if "choices" in response and response["choices"]:
+                        choice = response["choices"][0]
+                        if "message" in choice and "content" in choice["message"]:
+                            content = choice["message"]["content"]
+                
+                logger.info(f"✨ Direct response from RunPod: {content[:100]}..." if content else "No content extracted")
+                
+                if content:
+                    self.memory.add_message(Message.assistant_message(content))
                     self.state = AgentState.FINISHED
                     logger.info("✅ RunPod response processed successfully, agent finished")
                     return True
                 else:
-                    logger.warning("⚠️ Empty response from RunPod")
+                    logger.warning("⚠️ Empty content extracted from RunPod response")
                     # Add a fallback message if we can't get content
                     self.memory.add_message(Message.assistant_message(
                         "I apologize, but I couldn't process your request properly. Please try again."
