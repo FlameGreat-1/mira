@@ -422,7 +422,6 @@ class LLM:
             (OpenAIError, LLMError, Exception, ValueError)
         ),
     )
-
     async def ask_tool(
         self,
         messages: List[Union[dict, Message]],
@@ -504,61 +503,20 @@ class LLM:
             params["stream"] = False
 
             if self.api_type == "runpod":
+                # Use the existing client and parameters, just return the response directly
                 response = await self.client.chat.create(**params)
                 logger.debug(f"Raw RunPod response: {json.dumps(response)}")
-
-                if isinstance(response, dict):
-                    from dataclasses import dataclass, field
-
-                    @dataclass
-                    class MockFunction:
-                        name: str
-                        arguments: str
-
-                    @dataclass
-                    class MockToolCall:
-                        id: str
-                        type: str = "function"
-                        function: MockFunction = None
-
-                    @dataclass
-                    class MockMessage:
-                        content: str
-                        role: str = "assistant"
-                        tool_calls: List[MockToolCall] = None
-
-                    @dataclass
-                    class MockUsage:
-                        prompt_tokens: int
-                        completion_tokens: int
-                        total_tokens: int
-
-                    content = response.get("text", "")
-
-                    tool_calls_data = response.get("tool_calls", [])
-                    tool_calls = None
-                    if tool_calls_data:
-                        tool_calls = []
-                        for tc in tool_calls_data:
-                            tool_calls.append(MockToolCall(
-                                id=tc.get("id", f"call_{int(time.time())}"),
-                                function=MockFunction(
-                                    name=tc.get("name", ""),
-                                    arguments=tc.get("arguments", "{}")
-                                )
-                            ))
-
-                    message = MockMessage(content=content, tool_calls=tool_calls)
-
-                    usage = MockUsage(
-                        prompt_tokens=response.get("usage", {}).get("prompt_tokens", 0),
-                        completion_tokens=response.get("usage", {}).get("completion_tokens", 0),
-                        total_tokens=response.get("usage", {}).get("total_tokens", 0)
+                
+                # Update token counts if available
+                if isinstance(response, dict) and "usage" in response:
+                    usage = response["usage"]
+                    self.update_token_count(
+                        usage.get("prompt_tokens", 0), 
+                        usage.get("completion_tokens", 0)
                     )
-
-                    self.update_token_count(usage.prompt_tokens, usage.completion_tokens)
-
-                    return message
+                
+                # Return the response directly without creating a MockMessage
+                return response
             else:
                 response = await self.client.chat.completions.create(**params)
 
@@ -588,4 +546,3 @@ class LLM:
         except Exception as e:
             logger.error(f"Unexpected error in ask_tool: {e}")
             raise
-
