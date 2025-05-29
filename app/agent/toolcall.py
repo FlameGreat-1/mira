@@ -60,8 +60,23 @@ class ToolCallAgent(ReActAgent):
                     tool_choice="none",  # Explicitly disable tool choice
                 )
                 
-                content = response.content if response and response.content else ""
-                logger.info(f"✨ {self.name}'s direct response from RunPod: {content[:100]}...")
+                # Log the raw response for debugging
+                logger.debug(f"📝 Raw RunPod response type: {type(response)}")
+                logger.debug(f"📝 Raw RunPod response: {response}")
+                
+                # Extract content based on response type
+                content = ""
+                if response:
+                    if hasattr(response, 'content') and response.content:
+                        content = response.content
+                    elif hasattr(response, 'text') and response.text:
+                        content = response.text
+                    elif isinstance(response, dict):
+                        content = response.get('text', response.get('content', ''))
+                    elif isinstance(response, str):
+                        content = response
+                
+                logger.info(f"✨ {self.name}'s direct response from RunPod: {content[:100]}..." if content else "✨ No content extracted from RunPod response")
                 
                 if content:
                     self.memory.add_message(Message.assistant_message(content))
@@ -70,6 +85,11 @@ class ToolCallAgent(ReActAgent):
                     return True
                 else:
                     logger.warning("⚠️ Empty response from RunPod")
+                    # Add a fallback message if we can't get content
+                    self.memory.add_message(Message.assistant_message(
+                        "I apologize, but I couldn't process your request properly. Please try again."
+                    ))
+                    self.state = AgentState.FINISHED
                     return False
             except Exception as e:
                 logger.error(f"🚨 Error getting direct response from RunPod: {e}", exc_info=True)
