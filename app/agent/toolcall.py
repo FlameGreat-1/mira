@@ -75,9 +75,11 @@ class ToolCallAgent(ReActAgent):
                 logger.info(f"✨ Direct response from RunPod: {content[:100]}..." if content else "No content extracted")
                 
                 if content:
+                    
                     self.memory.add_message(Message.assistant_message(content))
-                    self.state = AgentState.FINISHED
-                    logger.info("✅ RunPod response processed successfully, agent finished")
+                    if "terminate" in content.lower():
+                        logger.info("✅ RunPod response contains termination request, finishing agent")
+                        self.state = AgentState.FINISHED
                     return True
                 else:
                     logger.warning("⚠️ Empty content extracted from RunPod response")
