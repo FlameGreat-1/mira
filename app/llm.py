@@ -17,6 +17,7 @@ from tenacity import (
     stop_after_attempt,
     wait_random_exponential,
 )
+from huggingface_hub import InferenceClient  # Add this import
 
 from app.bedrock import BedrockClient
 from app.config import LLMSettings, config
@@ -748,43 +749,98 @@ class LLM:
     async def ask_tool(
         self,
         messages: List[Union[dict, Message]],
+        tools: List[dict],
+        tool_choice: TOOL_CHOICE_TYPE = ToolChoice.AUTO,
         system_msgs: Optional[List[Union[dict, Message]]] = None,
-        timeout: int = 300,
-        tools: Optional[List[dict]] = None,
-        tool_choice: TOOL_CHOICE_TYPE = ToolChoice.AUTO,  # type: ignore
         temperature: Optional[float] = None,
-        **kwargs,
-    ) -> ChatCompletionMessage | None:
+    ) -> ChatCompletionMessage:
         """
-        Ask LLM using functions/tools and return the response.
+        Send a prompt to the LLM with tools and get the response with potential tool calls.
 
         Args:
             messages: List of conversation messages
+            tools: List of tool definitions
+            tool_choice: Tool choice strategy (auto, required, none)
             system_msgs: Optional system messages to prepend
-            timeout: Request timeout in seconds
-            tools: List of tools to use
-            tool_choice: Tool choice strategy
             temperature: Sampling temperature for the response
-            **kwargs: Additional completion arguments
 
         Returns:
-            ChatCompletionMessage: The model's response
+            ChatCompletionMessage: The generated response with potential tool calls
 
         Raises:
             TokenLimitExceeded: If token limits are exceeded
-            ValueError: If tools, tool_choice, or messages are invalid
+            ValueError: If messages are invalid or response is empty
             OpenAIError: If API call fails after retries
             Exception: For unexpected errors
         """
         try:
-            # Validate tool_choice
-            if tool_choice not in TOOL_CHOICE_VALUES:
-                raise ValueError(f"Invalid tool_choice: {tool_choice}")
-
+            # Handle Hugging Face DeepSeek model
+            if self.api_type == "huggingface_deepseek":
+                # Format messages for Hugging Face
+                formatted_messages = []
+                
+                # Add system message if provided
+                if system_msgs:
+                    for msg in system_msgs:
+                        if isinstance(msg, Message):
+                            formatted_messages.append({"role": "system", "content": msg.content})
+                        elif isinstance(msg, dict) and "content" in msg:
+                            formatted_messages.append({"role": "system", "content": msg["content"]})
+                
+                # Add conversation messages
+                for msg in messages:
+                    if isinstance(msg, Message):
+                        formatted_messages.append({"role": msg.role, "content": msg.content})
+                    elif isinstance(msg, dict) and "role" in msg and "content" in msg:
+                        formatted_messages.append({"role": msg["role"], "content": msg["content"]})
+                
+                # Calculate input tokens
+                input_tokens = self.count_message_tokens(formatted_messages)
+                
+                # Check token limits
+                if not self.check_token_limit(input_tokens):
+                    error_message = self.get_limit_error_message(input_tokens)
+                    raise TokenLimitExceeded(error_message)
+                
+                # Update token count
+                self.update_token_count(input_tokens)
+                
+                # Make the API call with tools
+                response = self.hf_client.chat_completion(
+                    model=self.model_id,
+                    messages=formatted_messages,
+                    tools=tools,
+                    max_tokens=self.max_tokens,
+                    temperature=temperature if temperature is not None else self.temperature
+                )
+                
+                # Extract the assistant's message
+                if response and response.choices and response.choices[0].message:
+                    # Create an OpenAI-compatible ChatCompletionMessage
+                    from openai.types.chat import ChatCompletionMessage
+                    
+                    # Extract content and tool_calls if available
+                    content = response.choices[0].message.content
+                    tool_calls = response.choices[0].message.tool_calls
+                    
+                    # Estimate completion tokens
+                    completion_tokens = self.count_tokens(content or "")
+                    self.update_token_count(0, completion_tokens)
+                    
+                    # Return a ChatCompletionMessage object
+                    return ChatCompletionMessage(
+                        role="assistant",
+                        content=content,
+                        tool_calls=tool_calls
+                    )
+                else:
+                    raise ValueError("Empty or invalid response from Hugging Face")
+            
+            # Original code for other API types
             # Check if the model supports images
             supports_images = self.model in MULTIMODAL_MODELS
 
-            # Format messages
+            # Format system and user messages with image support check
             if system_msgs:
                 system_msgs = self.format_messages(system_msgs, supports_images)
                 messages = system_msgs + self.format_messages(messages, supports_images)
@@ -794,35 +850,24 @@ class LLM:
             # Calculate input token count
             input_tokens = self.count_message_tokens(messages)
 
-            # If there are tools, calculate token count for tool descriptions
-            tools_tokens = 0
-            if tools:
-                for tool in tools:
-                    tools_tokens += self.count_tokens(str(tool))
-
-            input_tokens += tools_tokens
-
             # Check if token limits are exceeded
             if not self.check_token_limit(input_tokens):
                 error_message = self.get_limit_error_message(input_tokens)
                 # Raise a special exception that won't be retried
                 raise TokenLimitExceeded(error_message)
 
-            # Validate tools if provided
-            if tools:
-                for tool in tools:
-                    if not isinstance(tool, dict) or "type" not in tool:
-                        raise ValueError("Each tool must be a dict with 'type' field")
-
-            # Set up the completion request
+            # Prepare parameters
             params = {
                 "model": self.model,
                 "messages": messages,
                 "tools": tools,
-                "tool_choice": tool_choice,
-                "timeout": timeout,
-                **kwargs,
             }
+
+            # Add tool_choice if specified
+            if tool_choice is not None and tool_choice != ToolChoice.AUTO:
+                params["tool_choice"] = (
+                    tool_choice.value if hasattr(tool_choice, "value") else tool_choice
+                )
 
             if self.model in REASONING_MODELS:
                 params["max_completion_tokens"] = self.max_tokens
@@ -832,16 +877,11 @@ class LLM:
                     temperature if temperature is not None else self.temperature
                 )
 
-            params["stream"] = False  # Always use non-streaming for tool requests
-            response: ChatCompletion = await self.client.chat.completions.create(
-                **params
-            )
+            # Make the API call
+            response = await self.client.chat.completions.create(**params)
 
-            # Check if response is valid
             if not response.choices or not response.choices[0].message:
-                print(response)
-                # raise ValueError("Invalid or empty response from LLM")
-                return None
+                raise ValueError("Empty or invalid response from LLM")
 
             # Update token counts
             self.update_token_count(
@@ -853,11 +893,11 @@ class LLM:
         except TokenLimitExceeded:
             # Re-raise token limit errors without logging
             raise
-        except ValueError as ve:
-            logger.error(f"Validation error in ask_tool: {ve}")
+        except ValueError:
+            logger.exception(f"Validation error")
             raise
         except OpenAIError as oe:
-            logger.error(f"OpenAI API error: {oe}")
+            logger.exception(f"OpenAI API error")
             if isinstance(oe, AuthenticationError):
                 logger.error("Authentication failed. Check API key.")
             elif isinstance(oe, RateLimitError):
@@ -865,6 +905,6 @@ class LLM:
             elif isinstance(oe, APIError):
                 logger.error(f"API error: {oe}")
             raise
-        except Exception as e:
-            logger.error(f"Unexpected error in ask_tool: {e}")
+        except Exception:
+            logger.exception(f"Unexpected error in ask_tool")
             raise
