@@ -1,3 +1,4 @@
+curl -X POST https://mira-0gn4.onrender.com/api/chat -H "Content-Type: application/json" -H "Authorization: Bearer %TOKEN%" -d "{\"prompt\":\"I want you to give me a perfect birthday planning for my 11 years old kid who loves science and video games. Include a detailed timeline for the day, at least 5 themed activities, food and cake ideas, decoration suggestions, and gift recommendations. Also provide estimated costs for everything.\",\"system\":\"You are a helpful AI assistant. Answer the user's question directly and concisely without introducing yourself.\",\"stream\":false}"
 
 # Agent Framework API Documentation
 
