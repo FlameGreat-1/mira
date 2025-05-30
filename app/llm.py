@@ -221,10 +221,22 @@ class LLM:
                 )
             elif self.api_type == "aws":
                 self.client = BedrockClient()
+            elif self.api_type == "huggingface_deepseek":
+                # Import here to avoid dependency issues if not using this API type
+                from huggingface_hub import InferenceClient
+                
+                # Get token from environment variable if not provided
+                import os
+                hf_token = os.environ.get("HF_TOKEN", self.api_key)
+                
+                self.hf_client = InferenceClient(token=hf_token)
+                self.model_id = getattr(llm_config, "model_id", "deepseek-ai/DeepSeek-R1-0528")
+                logger.info(f"Initialized Hugging Face DeepSeek client with model: {self.model_id}")
             else:
                 self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
 
             self.token_counter = TokenCounter(self.tokenizer)
+
 
     def count_tokens(self, text: str) -> int:
         """Calculate the number of tokens in a text"""
