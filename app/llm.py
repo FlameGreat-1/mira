@@ -396,6 +396,98 @@ class LLM:
             Exception: For unexpected errors
         """
         try:
+            # Handle Hugging Face DeepSeek model
+            if self.api_type == "huggingface_deepseek":
+                # Format messages for Hugging Face
+                formatted_messages = []
+                
+                # Add system message if provided
+                if system_msgs:
+                    for msg in system_msgs:
+                        if isinstance(msg, Message):
+                            formatted_messages.append({"role": "system", "content": msg.content})
+                        elif isinstance(msg, dict) and "content" in msg:
+                            formatted_messages.append({"role": "system", "content": msg["content"]})
+                
+                # Add conversation messages
+                for msg in messages:
+                    if isinstance(msg, Message):
+                        formatted_messages.append({"role": msg.role, "content": msg.content})
+                    elif isinstance(msg, dict) and "role" in msg and "content" in msg:
+                        formatted_messages.append({"role": msg["role"], "content": msg["content"]})
+                
+                # Calculate input tokens
+                input_tokens = self.count_message_tokens(formatted_messages)
+                
+                # Check token limits
+                if not self.check_token_limit(input_tokens):
+                    error_message = self.get_limit_error_message(input_tokens)
+                    raise TokenLimitExceeded(error_message)
+                
+                # Update token count
+                self.update_token_count(input_tokens)
+                
+                # Set parameters
+                params = {
+                    "model": self.model_id,
+                    "messages": formatted_messages,
+                    "max_tokens": self.max_tokens,
+                    "temperature": temperature if temperature is not None else self.temperature
+                }
+                
+                if not stream:
+                    # Non-streaming request
+                    response = self.hf_client.chat_completion(**params)
+                    
+                    if not response.choices or not response.choices[0].message.content:
+                        raise ValueError("Empty or invalid response from Hugging Face")
+                    
+                    # Extract content and update token counts
+                    content = response.choices[0].message.content
+                    
+                    # Update token counts if usage information is available
+                    if hasattr(response, "usage"):
+                        self.update_token_count(
+                            response.usage.prompt_tokens, 
+                            response.usage.completion_tokens
+                        )
+                    else:
+                        # Estimate completion tokens
+                        completion_tokens = self.count_tokens(content)
+                        self.update_token_count(0, completion_tokens)
+                    
+                    return content
+                
+                # Streaming request
+                response = self.hf_client.chat_completion(stream=True, **params)
+                
+                collected_messages = []
+                completion_text = ""
+                
+                for chunk in response:
+                    if hasattr(chunk.choices[0], 'delta') and hasattr(chunk.choices[0].delta, 'content'):
+                        chunk_message = chunk.choices[0].delta.content or ""
+                    else:
+                        chunk_message = ""
+                    
+                    collected_messages.append(chunk_message)
+                    completion_text += chunk_message
+                    print(chunk_message, end="", flush=True)
+                
+                print()  # Newline after streaming
+                full_response = "".join(collected_messages).strip()
+                
+                if not full_response:
+                    raise ValueError("Empty response from streaming Hugging Face")
+                
+                # Estimate completion tokens for streaming response
+                completion_tokens = self.count_tokens(completion_text)
+                logger.info(f"Estimated completion tokens for streaming response: {completion_tokens}")
+                self.update_token_count(0, completion_tokens)
+                
+                return full_response
+            
+            # Original code for other API types
             # Check if the model supports images
             supports_images = self.model in MULTIMODAL_MODELS
 
@@ -489,7 +581,7 @@ class LLM:
         except Exception:
             logger.exception(f"Unexpected error in ask")
             raise
-
+            
     @retry(
         wait=wait_random_exponential(min=1, max=60),
         stop=stop_after_attempt(6),
