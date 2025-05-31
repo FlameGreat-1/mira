@@ -341,5 +341,11 @@ class Config:
         """Get the database URL from environment variables"""
         return os.environ.get('DATABASE_URL')    
 
+    @property
+    def SECRET_KEY(self):
+        """Get the secret key from environment variables"""
+        return os.environ.get('SECRET_KEY')
+        
+
 
 config = Config()
