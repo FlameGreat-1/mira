@@ -5,14 +5,14 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="openmanus",
+    name="mira",
     version="0.1.0",
     author="mannaandpoem and OpenManus Team",
-    author_email="mannaandpoem@gmail.com",
+    author_email="intellidev69@gmail.com",
     description="A versatile agent that can solve various tasks using multiple tools",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/mannaandpoem/OpenManus",
+    url="https://github.com/FlameGreat-1/mira",
     packages=find_packages(),
     install_requires=[
         "pydantic~=2.10.4",

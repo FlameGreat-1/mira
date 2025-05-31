@@ -26,8 +26,13 @@ class LLMSettings(BaseModel):
         description="Maximum input tokens to use across all requests (None for unlimited)",
     )
     temperature: float = Field(1.0, description="Sampling temperature")
-    api_type: str = Field(..., description="Azure, Openai, or Ollama")
-    api_version: str = Field(..., description="Azure Openai version if AzureOpenai")
+    api_type: str = Field(..., description="Azure, OpenAI, Ollama, or huggingface_deepseek")
+    api_version: Optional[str] = Field(None, description="API version if needed")
+    model_id: Optional[str] = Field(None, description="Model ID for Hugging Face models")
+    timeout: Optional[int] = Field(120, description="Request timeout in seconds")
+    retry_count: Optional[int] = Field(3, description="Number of retries for failed requests")
+    streaming_supported: Optional[bool] = Field(True, description="Whether streaming is supported")
+    endpoint_id: Optional[str] = Field(None, description="Endpoint ID for certain providers")
 
 
 class ProxySettings(BaseModel):
@@ -214,7 +219,12 @@ class Config:
             "max_input_tokens": base_llm.get("max_input_tokens"),
             "temperature": base_llm.get("temperature", 1.0),
             "api_type": base_llm.get("api_type", ""),
-            "api_version": base_llm.get("api_version", ""),
+            "api_version": base_llm.get("api_version"),
+            "model_id": base_llm.get("model_id"),
+            "timeout": base_llm.get("timeout", 120),
+            "retry_count": base_llm.get("retry_count", 3),
+            "streaming_supported": base_llm.get("streaming_supported", True),
+            "endpoint_id": base_llm.get("endpoint_id"),
         }
 
         # handle browser config.
