@@ -1,3 +1,4 @@
+import os
 import json
 import threading
 import tomllib
@@ -334,6 +335,11 @@ class Config:
     def root_path(self) -> Path:
         """Get the root path of the application"""
         return PROJECT_ROOT
+
+    @property
+    def DATABASE_URL(self):
+        """Get the database URL from environment variables"""
+        return os.environ.get('DATABASE_URL')    
 
 
 config = Config()
