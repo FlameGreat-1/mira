@@ -4,8 +4,7 @@ import tomllib
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field
-
+from pydantic import BaseModel, Field, model_validator
 
 def get_project_root() -> Path:
     """Get the project root directory"""
@@ -14,7 +13,6 @@ def get_project_root() -> Path:
 
 PROJECT_ROOT = get_project_root()
 WORKSPACE_ROOT = PROJECT_ROOT / "workspace"
-
 
 class LLMSettings(BaseModel):
     model: str = Field(..., description="Model name")
@@ -34,6 +32,17 @@ class LLMSettings(BaseModel):
     streaming_supported: Optional[bool] = Field(True, description="Whether streaming is supported")
     endpoint_id: Optional[str] = Field(None, description="Endpoint ID for certain providers")
 
+    @model_validator(mode="after")
+    def set_defaults_for_huggingface(self):
+        if self.api_type == "huggingface_deepseek":
+            # For Hugging Face DeepSeek, ensure model_id is set
+            if not self.model_id:
+                self.model_id = self.model
+
+            # If base_url is empty or None, set a default
+            if not self.base_url or self.base_url.isspace():
+                self.base_url = "https://api-inference.huggingface.co/models"
+        return self
 
 class ProxySettings(BaseModel):
     server: str = Field(None, description="Proxy server address")
