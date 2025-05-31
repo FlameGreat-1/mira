@@ -35,73 +35,15 @@ class ToolCallAgent(ReActAgent):
 
     max_steps: int = 30
     max_observe: Optional[Union[int, bool]] = None
-    
+
     async def think(self) -> bool:
         """Process current state and decide next actions using tools"""
         if self.next_step_prompt:
             user_msg = Message.user_message(self.next_step_prompt)
             self.messages += [user_msg]
 
-        # Special case for RunPod - bypass tool calling
-        if hasattr(self.llm, "api_type") and self.llm.api_type == "runpod":
-            logger.info("🔄 Using RunPod direct response mode (bypassing tool calling)")
-            try:
-                logger.debug(f"📝 System prompt: {self.system_prompt}")
-                logger.debug(f"📝 Messages count: {len(self.messages)}")
-                
-                response = await self.llm.ask_tool(
-                    messages=self.messages,
-                    system_msgs=(
-                        [Message.system_message(self.system_prompt)]
-                        if self.system_prompt
-                        else None
-                    ),
-                    tools=None,  # No tools
-                    tool_choice="none",  # Explicitly disable tool choice
-                )
-                
-                # Log the raw response for debugging
-                logger.debug(f"📝 Raw RunPod response type: {type(response)}")
-                logger.debug(f"📝 Raw RunPod response: {response}")
-                
-                # Extract content from the OpenAI-compatible response format
-                content = ""
-                if isinstance(response, dict):
-                    if "choices" in response and response["choices"]:
-                        choice = response["choices"][0]
-                        if "message" in choice and "content" in choice["message"]:
-                            content = choice["message"]["content"]
-                
-                logger.info(f"✨ Direct response from RunPod: {content[:100]}..." if content else "No content extracted")
-                
-                if content:
-                    
-                    self.memory.add_message(Message.assistant_message(content))
-                    if "terminate" in content.lower():
-                        logger.info("✅ RunPod response contains termination request, finishing agent")
-                        self.state = AgentState.FINISHED
-                    return True
-                else:
-                    logger.warning("⚠️ Empty content extracted from RunPod response")
-                    # Add a fallback message if we can't get content
-                    self.memory.add_message(Message.assistant_message(
-                        "I apologize, but I couldn't process your request properly. Please try again."
-                    ))
-                    self.state = AgentState.FINISHED
-                    return False
-            except Exception as e:
-                logger.error(f"🚨 Error getting direct response from RunPod: {e}", exc_info=True)
-                self.memory.add_message(
-                    Message.assistant_message(
-                        f"Error encountered while processing: {str(e)}"
-                    )
-                )
-                self.state = AgentState.FINISHED
-                return False
-
         try:
             # Get response with tool options
-            logger.info(f"🔧 Getting response with tools from {self.llm.api_type}")
             response = await self.llm.ask_tool(
                 messages=self.messages,
                 system_msgs=(
@@ -185,7 +127,7 @@ class ToolCallAgent(ReActAgent):
                 )
             )
             return False
-            
+
     async def act(self) -> str:
         """Execute tool calls and handle their results"""
         if not self.tool_calls:
