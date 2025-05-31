@@ -9,12 +9,11 @@ timeout = 120  # Connection timeout in seconds
 retry_count = 3  
 streaming_supported = true
 
-# Vision model configuration (OpenAI as fallback since DeepSeek doesn't support vision)
+# Vision model configuration using DeepSeek
 [llm.vision]
-api_type = "openai"
-model = "gpt-4o"
-base_url = "https://api.openai.com/v1"
-api_key = ""  # Will be provided by environment variable
+api_type = "huggingface_deepseek"
+model_id = "deepseek-ai/DeepSeek-R1-0528"
+api_key = ""  # Will be provided by environment variable HF_TOKEN
 max_tokens = 4096
 temperature = 0.7
 
