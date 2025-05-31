@@ -7,7 +7,7 @@ max_tokens = 4096
 temperature = 0.7
 timeout = 120  # Connection timeout in seconds
 retry_count = 3  
-streaming_supported = false  # Hugging Face doesn't support streaming
+streaming_supported = true
 
 # Vision model configuration (OpenAI as fallback since DeepSeek doesn't support vision)
 [llm.vision]
