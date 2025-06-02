@@ -193,13 +193,23 @@ class LLM:
                 self.client = BedrockClient()
             elif self.api_type == "huggingface_deepseek":
                 hf_token = os.environ.get("HF_TOKEN", self.api_key)
-                self.hf_client = InferenceClient(token=hf_token)
                 self.model_id = llm_config.model_id if hasattr(llm_config, "model_id") else "deepseek-ai/DeepSeek-R1-0528"
+                self.hf_client = InferenceClient(
+                    model=self.model_id,
+                    token=hf_token
+                )
                 logger.info(f"Initialized Hugging Face DeepSeek client with model: {self.model_id}")
             else:
                 self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
 
             self.token_counter = TokenCounter(self.tokenizer)
+
+    def _strip_thinking(self, content: str) -> str:
+        if "<think>" in content and "</think>" in content:
+            parts = content.split("</think>", 1)
+            if len(parts) > 1:
+                return parts[1].strip()
+        return content
 
     def count_tokens(self, text: str) -> int:
         if not text:
@@ -348,6 +358,7 @@ class LLM:
                         raise ValueError("Empty or invalid response from Hugging Face")
                     
                     content = response.choices[0].message.content
+                    content = self._strip_thinking(content)  
                     
                     if hasattr(response, "usage"):
                         self.update_token_count(
@@ -379,7 +390,8 @@ class LLM:
                     except (AttributeError, IndexError) as e:
                         logger.warning(f"Error parsing chunk: {e}")
                         continue
-                    
+                    if "<think>" in chunk_message or "</think>" in chunk_message:
+                       continue
                     collected_messages.append(chunk_message)
                     completion_text += chunk_message
                     logger.debug(f"Streaming chunk: {chunk_message}")
@@ -520,11 +532,18 @@ class LLM:
                     max_tokens=self.max_tokens,
                     temperature=temperature if temperature is not None else self.temperature
                 )
-                
+                if not response.choices or not response.choices[0].message:
+                    raise ValueError("Empty or invalid response from Hugging Face")
+                message = response.choices[0].message
+                content = message.content
+                content = self._strip_thinking(content)  
+                message.content = content  
+               
                 if response and response.choices and response.choices[0].message:
                     from openai.types.chat import ChatCompletionMessage
                     
                     content = response.choices[0].message.content
+                    content = self._strip_thinking(content)
                     tool_calls = response.choices[0].message.tool_calls
                     
                     completion_tokens = self.count_tokens(content or "")
@@ -676,6 +695,7 @@ class LLM:
                         raise ValueError("Empty or invalid response from Hugging Face")
                     
                     content = response.choices[0].message.content
+                    content = self._strip_thinking(content)
                     
                     if hasattr(response, "usage"):
                         self.update_token_count(
@@ -707,7 +727,8 @@ class LLM:
                     except (AttributeError, IndexError) as e:
                         logger.warning(f"Error parsing chunk: {e}")
                         continue
-                    
+                    if "<think>" in chunk_message or "</think>" in chunk_message:
+                       continue
                     collected_messages.append(chunk_message)
                     completion_text += chunk_message
                     logger.debug(f"Streaming chunk: {chunk_message}")

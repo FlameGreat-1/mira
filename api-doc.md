@@ -12,7 +12,7 @@ This document provides comprehensive documentation for the Agent Framework API e
 
 ### 1. Register a new user
 ```bash
-curl -X POST https://mira-0gn4.onrender.com/auth/register \
+curl -X POST https://mira-9ycj.onrender.com/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "username": "testuser",
@@ -24,7 +24,7 @@ curl -X POST https://mira-0gn4.onrender.com/auth/register \
 
 ### 2. Login and get a token
 ```bash
-curl -X POST https://mira-0gn4.onrender.com/auth/login \
+curl -X POST https://mira-9ycj.onrender.com/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "username": "testuser",
@@ -39,7 +39,7 @@ set TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiZGJiOGE2N2QtNzY5N
 
 ### 3. Request a password reset
 ```bash
-curl -X POST https://mira-0gn4.onrender.com/auth/forgot-password \
+curl -X POST https://mira-9ycj.onrender.com/auth/forgot-password \
   -H "Content-Type: application/json" \
   -d '{
     "email": "test@example.com"
@@ -49,7 +49,7 @@ If DEBUG is enabled, you'll get a debug_token in the response.
 
 ### 4. Reset password with token
 ```bash
-curl -X POST https://mira-0gn4.onrender.com/auth/reset-password \
+curl -X POST https://mira-9ycj.onrender.com/auth/reset-password \
   -H "Content-Type: application/json" \
   -d '{
     "token": "YOUR_RESET_TOKEN",
@@ -254,8 +254,6 @@ curl -X POST https://mira-0gn4.onrender.com/api/chat -H "Content-Type: applicati
 ```
 
 ## Integration Notes
-
-The Agent Framework is configured to communicate with the RunPod AI service at `https://alhgtq3p5oelru-8888.proxy.runpod.net` using API key `7f8e9d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8`.
 
 All API requests (except health check) require authentication with a valid JWT token obtained from the login endpoint.
 
