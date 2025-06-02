@@ -194,10 +194,7 @@ class LLM:
             elif self.api_type == "huggingface_deepseek":
                 hf_token = os.environ.get("HF_TOKEN", self.api_key)
                 self.model_id = llm_config.model_id if hasattr(llm_config, "model_id") else "deepseek-ai/DeepSeek-R1-0528"
-                self.hf_client = InferenceClient(
-                    model=self.model_id,
-                    token=hf_token
-                )
+                self.hf_client = InferenceClient(token=hf_token)
                 logger.info(f"Initialized Hugging Face DeepSeek client with model: {self.model_id}")
             else:
                 self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
