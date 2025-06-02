@@ -66,7 +66,7 @@ curl https://mira-0gn4.onrender.com/health
 
 ### 2. Login to Get Auth Token
 ```bash
-curl -X POST https://mira-0gn4.onrender.com/auth/login \
+curl -X POST https://mira-9ycj.onrender.com/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "username": "testuser",
@@ -76,7 +76,7 @@ curl -X POST https://mira-0gn4.onrender.com/auth/login \
 
 Save the token from the response:
 ```
-TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+set TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 ### 3. Chat API (Non-streaming)
