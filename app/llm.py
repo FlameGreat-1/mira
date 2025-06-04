@@ -192,7 +192,14 @@ class LLM:
             elif self.api_type == "aws":
                 self.client = BedrockClient()
             elif self.api_type == "huggingface_deepseek":
-                hf_token = os.environ.get("HF_TOKEN", self.api_key)
+                hf_token = os.environ.get("HF_TOKEN")
+                if not hf_token:
+                    logger.warning("HF_TOKEN environment variable not found, checking api_key")
+                    hf_token = self.api_key
+                if not hf_token:
+                    logger.error("No Hugging Face token available. Set HF_TOKEN environment variable or api_key in config.")
+                    raise ValueError("No Hugging Face token available")
+    
                 self.model_id = llm_config.model_id if hasattr(llm_config, "model_id") else "deepseek-ai/DeepSeek-R1-0528"
                 self.hf_client = InferenceClient(
                     model=self.model_id,
@@ -343,7 +350,6 @@ class LLM:
                         formatted_messages.append({"role": msg["role"], "content": msg["content"]})
                 
                 params = {
-                    "model": self.model_id,
                     "messages": formatted_messages,
                     "max_tokens": self.max_tokens,
                     "temperature": temperature if temperature is not None else self.temperature
@@ -526,7 +532,6 @@ class LLM:
                 
                 response = await asyncio.to_thread(
                     self.hf_client.chat_completion,
-                    model=self.model_id,
                     messages=formatted_messages,
                     tools=tools,
                     max_tokens=self.max_tokens,
@@ -682,7 +687,6 @@ class LLM:
                 self.update_token_count(input_tokens)
                 
                 params = {
-                    "model": self.model_id,
                     "messages": formatted_messages,
                     "max_tokens": self.max_tokens,
                     "temperature": temperature if temperature is not None else self.temperature
