@@ -545,6 +545,13 @@ class LLM:
                 
                 self.update_token_count(input_tokens)
                 
+                logger.info(f"DeepSeek API call details:")
+                logger.info(f"Model ID: {self.model_id}")
+                logger.info(f"Number of messages: {len(formatted_messages)}")
+                logger.info(f"First few messages: {formatted_messages[:2]}")
+                logger.info(f"Max tokens: {self.max_tokens}")
+                logger.info(f"Temperature: {temperature if temperature is not None else self.temperature}")
+
                 response = await asyncio.to_thread(
                     self.hf_client.chat_completion,
                     messages=formatted_messages,
