@@ -1,6 +1,7 @@
 import math
 import asyncio
 import os
+import json
 from typing import Dict, List, Optional, Union
 
 import tiktoken
@@ -522,6 +523,20 @@ class LLM:
                         elif isinstance(msg, dict) and "content" in msg:
                             formatted_messages.append({"role": "system", "content": msg["content"]})
                 
+                if tools:
+                    tools_description = "You have access to the following tools:\n\n"
+                    for tool in tools:
+                        tools_description += f"Tool: {tool['function']['name']}\n"
+                        tools_description += f"Description: {tool['function']['description']}\n"
+                        if 'parameters' in tool['function']:
+                            tools_description += f"Parameters: {json.dumps(tool['function']['parameters'], indent=2)}\n"
+                        tools_description += "\n"
+                    
+                    tools_description += "\nTo use a tool, respond with a message in this format:\n"
+                    tools_description += '```json\n{"tool_calls": [{"function": {"name": "tool_name", "arguments": {"arg1": "value1", "arg2": "value2"}}}]}\n```\n\n'
+                    
+                    formatted_messages.append({"role": "system", "content": tools_description})
+                
                 for msg in messages:
                     if isinstance(msg, Message):
                         formatted_messages.append({"role": msg.role, "content": msg.content})
@@ -533,34 +548,55 @@ class LLM:
                 response = await asyncio.to_thread(
                     self.hf_client.chat_completion,
                     messages=formatted_messages,
-                    tools=tools,
                     max_tokens=self.max_tokens,
                     temperature=temperature if temperature is not None else self.temperature
                 )
+                
                 if not response.choices or not response.choices[0].message:
                     raise ValueError("Empty or invalid response from Hugging Face")
-                message = response.choices[0].message
-                content = message.content
-                content = self._strip_thinking(content)  
-                message.content = content  
-               
-                if response and response.choices and response.choices[0].message:
-                    from openai.types.chat import ChatCompletionMessage
+                
+                content = response.choices[0].message.content
+                content = self._strip_thinking(content)
+                
+                tool_calls = []
+                try:
+                    import re
+                    json_blocks = re.findall(r'```json\n(.*?)\n```|{.*}', content, re.DOTALL)
                     
-                    content = response.choices[0].message.content
-                    content = self._strip_thinking(content)
-                    tool_calls = response.choices[0].message.tool_calls
-                    
-                    completion_tokens = self.count_tokens(content or "")
-                    self.update_token_count(0, completion_tokens)
-                    
-                    return ChatCompletionMessage(
-                        role="assistant",
-                        content=content,
-                        tool_calls=tool_calls
-                    )
-                else:
-                    raise ValueError("Empty or invalid response from Hugging Face")
+                    for block in json_blocks:
+                        try:
+                            parsed = json.loads(block.strip())
+                            if 'tool_calls' in parsed:
+                                tool_calls = parsed['tool_calls']
+                                content = content.replace(f"```json\n{block}\n```", "").strip()
+                                break
+                        except:
+                            continue
+                except:
+                    pass
+                
+                from openai.types.chat import ChatCompletionMessage
+                
+                openai_tool_calls = []
+                if tool_calls:
+                    for i, call in enumerate(tool_calls):
+                        openai_tool_calls.append({
+                            "id": f"call_{i}",
+                            "type": "function",
+                            "function": {
+                                "name": call["function"]["name"],
+                                "arguments": json.dumps(call["function"]["arguments"])
+                            }
+                        })
+                
+                completion_tokens = self.count_tokens(content or "")
+                self.update_token_count(0, completion_tokens)
+                
+                return ChatCompletionMessage(
+                    role="assistant",
+                    content=content,
+                    tool_calls=openai_tool_calls if openai_tool_calls else None
+                )
             else:
                 params = {
                     "model": self.model,
@@ -608,7 +644,7 @@ class LLM:
             raise
         except Exception:
             logger.exception(f"Unexpected error in ask_tool")
-            raise
+            raise        
             
     @retry(
         wait=wait_random_exponential(min=1, max=60),
