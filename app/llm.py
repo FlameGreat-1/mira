@@ -200,13 +200,16 @@ class LLM:
                 if not hf_token:
                     logger.error("No Hugging Face token available. Set HF_TOKEN environment variable or api_key in config.")
                     raise ValueError("No Hugging Face token available")
-    
-                self.model_id = llm_config.model_id if hasattr(llm_config, "model_id") else "deepseek-ai/DeepSeek-R1-0528"
+                    
+                model_name = getattr(llm_config, 'model', 'deepseek-ai/DeepSeek-R1-0528')
+                self.model_name = model_name
+   
                 self.hf_client = InferenceClient(
-                    model=self.model_id,
+                    model=model_name,
                     token=hf_token
                 )
-                logger.info(f"Initialized Hugging Face DeepSeek client with model: {self.model_id}")
+                
+                logger.info(f"Initialized Hugging Face DeepSeek client with model: {self.model_name}")
             else:
                 self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
 
@@ -546,7 +549,7 @@ class LLM:
                 self.update_token_count(input_tokens)
                 
                 logger.info(f"DeepSeek API call details:")
-                logger.info(f"Model ID: {self.model_id}")
+                logger.info(f"Model ID: {self.model_name}")
                 logger.info(f"Number of messages: {len(formatted_messages)}")
                 logger.info(f"First few messages: {formatted_messages[:2]}")
                 logger.info(f"Max tokens: {self.max_tokens}")
@@ -582,7 +585,6 @@ class LLM:
                 except:
                     pass
                 
-                from openai.types.chat import ChatCompletionMessage
                 
                 openai_tool_calls = []
                 if tool_calls:
