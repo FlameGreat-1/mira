@@ -1,9 +1,10 @@
+
 # Default LLM configuration (DeepSeek via Hugging Face)
 [llm]
 api_type = "huggingface_deepseek"
 model = "deepseek-ai/DeepSeek-R1-0528"
 base_url = "https://api-inference.huggingface.co/models"
-api_key = ""
+api_key = "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"
 max_tokens = 4096
 temperature = 0.7
 timeout = 120
@@ -15,7 +16,7 @@ streaming_supported = true
 api_type = "huggingface_deepseek"
 model = "deepseek-ai/DeepSeek-R1-0528"
 base_url = "https://api-inference.huggingface.co/models"
-api_key = ""
+api_key = "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"
 max_tokens = 4096
 temperature = 0.7
 
@@ -52,7 +53,7 @@ temperature = 0.7
 api_type = "huggingface_deepseek"
 model = "deepseek-ai/DeepSeek-R1-0528"
 base_url = "https://api-inference.huggingface.co/models"
-api_key = ""
+api_key = "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"
 max_tokens = 4096
 temperature = 0.7
 timeout = 120
@@ -87,3 +88,4 @@ network_enabled = false
 # MCP configuration
 [mcp]
 server_reference = "app.mcp.server"
+
