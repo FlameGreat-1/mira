@@ -9,6 +9,8 @@ temperature = 0.7
 timeout = 120
 retry_count = 3
 streaming_supported = true
+http_referer = "https://mira-9ycj.onrender.com"
+x_title = "Mira AI Agent"
 
 # Vision model configuration using Qwen3
 [llm.vision]
@@ -18,6 +20,8 @@ base_url = "https://openrouter.ai/api/v1"
 api_key = ""
 max_tokens = 4096
 temperature = 0.7
+http_referer = "https://mira-9ycj.onrender.com"
+x_title = "Mira AI Agent"
 
 # OpenAI configuration (alternative provider)
 [llm.openai]

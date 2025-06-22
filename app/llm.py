@@ -207,6 +207,8 @@ class LLM:
                 if hasattr(llm_config, "max_input_tokens")
                 else None
             )
+            self.http_referer = getattr(llm_config, 'http_referer', None)
+            self.x_title = getattr(llm_config, 'x_title', None)
 
             # Initialize tokenizer
             try:
@@ -362,7 +364,7 @@ class LLM:
         stop=stop_after_attempt(6),
         retry=retry_if_exception_type(
             (OpenAIError, Exception, ValueError)
-        ),  # Don't retry TokenLimitExceeded
+        ),
     )
     async def ask(
         self,
@@ -371,42 +373,19 @@ class LLM:
         stream: bool = True,
         temperature: Optional[float] = None,
     ) -> str:
-        """
-        Send a prompt to the LLM and get the response.
-
-        Args:
-            messages: List of conversation messages
-            system_msgs: Optional system messages to prepend
-            stream (bool): Whether to stream the response
-            temperature (float): Sampling temperature for the response
-
-        Returns:
-            str: The generated response
-
-        Raises:
-            TokenLimitExceeded: If token limits are exceeded
-            ValueError: If messages are invalid or response is empty
-            OpenAIError: If API call fails after retries
-            Exception: For unexpected errors
-        """
         try:
-            # Check if the model supports images
             supports_images = self.model in MULTIMODAL_MODELS
 
-            # Format system and user messages with image support check
             if system_msgs:
                 system_msgs = self.format_messages(system_msgs, supports_images)
                 messages = system_msgs + self.format_messages(messages, supports_images)
             else:
                 messages = self.format_messages(messages, supports_images)
 
-            # Calculate input token count
             input_tokens = self.count_message_tokens(messages)
 
-            # Check if token limits are exceeded
             if not self.check_token_limit(input_tokens):
                 error_message = self.get_limit_error_message(input_tokens)
-                # Raise a special exception that won't be retried
                 raise TokenLimitExceeded(error_message)
 
             params = {
@@ -423,25 +402,48 @@ class LLM:
                 )
 
             if not stream:
-                # Non-streaming request
-                response = await self.client.chat.completions.create(
-                    **params, stream=False
-                )
+                if "openrouter.ai" in self.base_url:
+                    extra_headers = {}
+                    if self.http_referer:
+                        extra_headers["HTTP-Referer"] = self.http_referer
+                    if self.x_title:
+                        extra_headers["X-Title"] = self.x_title
+                    
+                    response = await self.client.chat.completions.create(
+                        **params, 
+                        stream=False,
+                        extra_headers=extra_headers
+                    )
+                else:
+                    response = await self.client.chat.completions.create(
+                        **params, stream=False
+                    )
 
                 if not response.choices or not response.choices[0].message.content:
                     raise ValueError("Empty or invalid response from LLM")
 
-                # Update token counts
                 self.update_token_count(
                     response.usage.prompt_tokens, response.usage.completion_tokens
                 )
 
                 return response.choices[0].message.content
 
-            # Streaming request, For streaming, update estimated token count before making the request
             self.update_token_count(input_tokens)
 
-            response = await self.client.chat.completions.create(**params, stream=True)
+            if "openrouter.ai" in self.base_url:
+                extra_headers = {}
+                if self.http_referer:
+                    extra_headers["HTTP-Referer"] = self.http_referer
+                if self.x_title:
+                    extra_headers["X-Title"] = self.x_title
+                
+                response = await self.client.chat.completions.create(
+                    **params, 
+                    stream=True,
+                    extra_headers=extra_headers
+                )
+            else:
+                response = await self.client.chat.completions.create(**params, stream=True)
 
             collected_messages = []
             completion_text = ""
@@ -451,12 +453,11 @@ class LLM:
                 completion_text += chunk_message
                 print(chunk_message, end="", flush=True)
 
-            print()  # Newline after streaming
+            print()
             full_response = "".join(collected_messages).strip()
             if not full_response:
                 raise ValueError("Empty response from streaming LLM")
 
-            # estimate completion tokens for streaming response
             completion_tokens = self.count_tokens(completion_text)
             logger.info(
                 f"Estimated completion tokens for streaming response: {completion_tokens}"
@@ -466,7 +467,6 @@ class LLM:
             return full_response
 
         except TokenLimitExceeded:
-            # Re-raise token limit errors without logging
             raise
         except ValueError:
             logger.exception(f"Validation error")
@@ -489,7 +489,7 @@ class LLM:
         stop=stop_after_attempt(6),
         retry=retry_if_exception_type(
             (OpenAIError, Exception, ValueError)
-        ),  # Don't retry TokenLimitExceeded
+        ),
     )
     async def ask_with_images(
         self,
@@ -499,46 +499,21 @@ class LLM:
         stream: bool = False,
         temperature: Optional[float] = None,
     ) -> str:
-        """
-        Send a prompt with images to the LLM and get the response.
-
-        Args:
-            messages: List of conversation messages
-            images: List of image URLs or image data dictionaries
-            system_msgs: Optional system messages to prepend
-            stream (bool): Whether to stream the response
-            temperature (float): Sampling temperature for the response
-
-        Returns:
-            str: The generated response
-
-        Raises:
-            TokenLimitExceeded: If token limits are exceeded
-            ValueError: If messages are invalid or response is empty
-            OpenAIError: If API call fails after retries
-            Exception: For unexpected errors
-        """
         try:
-            # For ask_with_images, we always set supports_images to True because
-            # this method should only be called with models that support images
             if self.model not in MULTIMODAL_MODELS:
                 raise ValueError(
                     f"Model {self.model} does not support images. Use a model from {MULTIMODAL_MODELS}"
                 )
 
-            # Format messages with image support
             formatted_messages = self.format_messages(messages, supports_images=True)
 
-            # Ensure the last message is from the user to attach images
             if not formatted_messages or formatted_messages[-1]["role"] != "user":
                 raise ValueError(
                     "The last message must be from the user to attach images"
                 )
 
-            # Process the last user message to include images
             last_message = formatted_messages[-1]
 
-            # Convert content to multimodal format if needed
             content = last_message["content"]
             multimodal_content = (
                 [{"type": "text", "text": content}]
@@ -548,7 +523,6 @@ class LLM:
                 else []
             )
 
-            # Add images to content
             for image in images:
                 if isinstance(image, str):
                     multimodal_content.append(
@@ -561,10 +535,8 @@ class LLM:
                 else:
                     raise ValueError(f"Unsupported image format: {image}")
 
-            # Update the message with multimodal content
             last_message["content"] = multimodal_content
 
-            # Add system messages if provided
             if system_msgs:
                 all_messages = (
                     self.format_messages(system_msgs, supports_images=True)
@@ -573,19 +545,16 @@ class LLM:
             else:
                 all_messages = formatted_messages
 
-            # Calculate tokens and check limits
             input_tokens = self.count_message_tokens(all_messages)
             if not self.check_token_limit(input_tokens):
                 raise TokenLimitExceeded(self.get_limit_error_message(input_tokens))
 
-            # Set up API parameters
             params = {
                 "model": self.model,
                 "messages": all_messages,
                 "stream": stream,
             }
 
-            # Add model-specific parameters
             if self.model in REASONING_MODELS:
                 params["max_completion_tokens"] = self.max_tokens
             else:
@@ -594,19 +563,42 @@ class LLM:
                     temperature if temperature is not None else self.temperature
                 )
 
-            # Handle non-streaming request
             if not stream:
-                response = await self.client.chat.completions.create(**params)
-
+                if "openrouter.ai" in self.base_url:
+                    extra_headers = {}
+                    if self.http_referer:
+                        extra_headers["HTTP-Referer"] = self.http_referer
+                    if self.x_title:
+                        extra_headers["X-Title"] = self.x_title
+                    
+                    response = await self.client.chat.completions.create(
+                        **params,
+                        extra_headers=extra_headers
+                    )
+                else:
+                    response = await self.client.chat.completions.create(**params)
+                    
                 if not response.choices or not response.choices[0].message.content:
                     raise ValueError("Empty or invalid response from LLM")
 
                 self.update_token_count(response.usage.prompt_tokens)
                 return response.choices[0].message.content
 
-            # Handle streaming request
             self.update_token_count(input_tokens)
-            response = await self.client.chat.completions.create(**params)
+            
+            if "openrouter.ai" in self.base_url:
+                extra_headers = {}
+                if self.http_referer:
+                    extra_headers["HTTP-Referer"] = self.http_referer
+                if self.x_title:
+                    extra_headers["X-Title"] = self.x_title
+                
+                response = await self.client.chat.completions.create(
+                    **params,
+                    extra_headers=extra_headers
+                )
+            else:
+                response = await self.client.chat.completions.create(**params)
 
             collected_messages = []
             async for chunk in response:
@@ -614,7 +606,7 @@ class LLM:
                 collected_messages.append(chunk_message)
                 print(chunk_message, end="", flush=True)
 
-            print()  # Newline after streaming
+            print()
             full_response = "".join(collected_messages).strip()
 
             if not full_response:
@@ -645,7 +637,7 @@ class LLM:
         stop=stop_after_attempt(6),
         retry=retry_if_exception_type(
             (OpenAIError, Exception, ValueError)
-        ),  # Don't retry TokenLimitExceeded
+        ),
     )
     async def ask_tool(
         self,
@@ -653,50 +645,24 @@ class LLM:
         system_msgs: Optional[List[Union[dict, Message]]] = None,
         timeout: int = 300,
         tools: Optional[List[dict]] = None,
-        tool_choice: TOOL_CHOICE_TYPE = ToolChoice.AUTO,  # type: ignore
+        tool_choice: TOOL_CHOICE_TYPE = ToolChoice.AUTO,
         temperature: Optional[float] = None,
         **kwargs,
     ) -> ChatCompletionMessage | None:
-        """
-        Ask LLM using functions/tools and return the response.
-
-        Args:
-            messages: List of conversation messages
-            system_msgs: Optional system messages to prepend
-            timeout: Request timeout in seconds
-            tools: List of tools to use
-            tool_choice: Tool choice strategy
-            temperature: Sampling temperature for the response
-            **kwargs: Additional completion arguments
-
-        Returns:
-            ChatCompletionMessage: The model's response
-
-        Raises:
-            TokenLimitExceeded: If token limits are exceeded
-            ValueError: If tools, tool_choice, or messages are invalid
-            OpenAIError: If API call fails after retries
-            Exception: For unexpected errors
-        """
         try:
-            # Validate tool_choice
             if tool_choice not in TOOL_CHOICE_VALUES:
                 raise ValueError(f"Invalid tool_choice: {tool_choice}")
 
-            # Check if the model supports images
             supports_images = self.model in MULTIMODAL_MODELS
 
-            # Format messages
             if system_msgs:
                 system_msgs = self.format_messages(system_msgs, supports_images)
                 messages = system_msgs + self.format_messages(messages, supports_images)
             else:
                 messages = self.format_messages(messages, supports_images)
 
-            # Calculate input token count
             input_tokens = self.count_message_tokens(messages)
 
-            # If there are tools, calculate token count for tool descriptions
             tools_tokens = 0
             if tools:
                 for tool in tools:
@@ -704,19 +670,15 @@ class LLM:
 
             input_tokens += tools_tokens
 
-            # Check if token limits are exceeded
             if not self.check_token_limit(input_tokens):
                 error_message = self.get_limit_error_message(input_tokens)
-                # Raise a special exception that won't be retried
                 raise TokenLimitExceeded(error_message)
 
-            # Validate tools if provided
             if tools:
                 for tool in tools:
                     if not isinstance(tool, dict) or "type" not in tool:
                         raise ValueError("Each tool must be a dict with 'type' field")
 
-            # Set up the completion request
             params = {
                 "model": self.model,
                 "messages": messages,
@@ -734,18 +696,28 @@ class LLM:
                     temperature if temperature is not None else self.temperature
                 )
 
-            params["stream"] = False  # Always use non-streaming for tool requests
-            response: ChatCompletion = await self.client.chat.completions.create(
-                **params
-            )
+            params["stream"] = False
 
-            # Check if response is valid
+            if "openrouter.ai" in self.base_url:
+                extra_headers = {}
+                if self.http_referer:
+                    extra_headers["HTTP-Referer"] = self.http_referer
+                if self.x_title:
+                    extra_headers["X-Title"] = self.x_title
+                
+                response: ChatCompletion = await self.client.chat.completions.create(
+                    **params,
+                    extra_headers=extra_headers
+                )
+            else:
+                response: ChatCompletion = await self.client.chat.completions.create(
+                    **params
+                )
+
             if not response.choices or not response.choices[0].message:
                 print(response)
-                # raise ValueError("Invalid or empty response from LLM")
                 return None
 
-            # Update token counts
             self.update_token_count(
                 response.usage.prompt_tokens, response.usage.completion_tokens
             )
@@ -753,7 +725,6 @@ class LLM:
             return response.choices[0].message
 
         except TokenLimitExceeded:
-            # Re-raise token limit errors without logging
             raise
         except ValueError as ve:
             logger.error(f"Validation error in ask_tool: {ve}")
@@ -770,3 +741,4 @@ class LLM:
         except Exception as e:
             logger.error(f"Unexpected error in ask_tool: {e}")
             raise
+          
