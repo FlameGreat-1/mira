@@ -224,7 +224,11 @@ class LLM:
             elif self.api_type == "aws":
                 self.client = BedrockClient()
             else:
-                self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+                if "openrouter.ai" in self.base_url:
+                    api_key = os.environ.get("OPENROUTER_API_KEY") or self.api_key
+                else:
+                    api_key = self.api_key
+                self.client = AsyncOpenAI(api_key=api_key, base_url=self.base_url)
 
             self.token_counter = TokenCounter(self.tokenizer)
 
