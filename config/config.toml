@@ -1,9 +1,8 @@
-
-# Default LLM configuration (DeepSeek via Hugging Face)
+# Default LLM configuration (OpenRouter - Qwen3)
 [llm]
-api_type = "huggingface_deepseek"
-model = "deepseek-ai/DeepSeek-R1-0528"
-base_url = "https://api-inference.huggingface.co/models"
+api_type = "openai"
+model = "qwen/qwen3-32b:free"
+base_url = "https://openrouter.ai/api/v1"
 api_key = ""
 max_tokens = 4096
 temperature = 0.7
@@ -11,11 +10,11 @@ timeout = 120
 retry_count = 3
 streaming_supported = true
 
-# Vision model configuration using DeepSeek
+# Vision model configuration using Qwen3
 [llm.vision]
-api_type = "huggingface_deepseek"
-model = "deepseek-ai/DeepSeek-R1-0528"
-base_url = "https://api-inference.huggingface.co/models"
+api_type = "openai"
+model = "qwen/qwen3-32b:free"
+base_url = "https://openrouter.ai/api/v1"
 api_key = ""
 max_tokens = 4096
 temperature = 0.7
@@ -48,11 +47,11 @@ api_key = ""
 max_tokens = 4096
 temperature = 0.7
 
-# DeepSeek configuration (explicit section)
-[llm.huggingface_deepseek]
-api_type = "huggingface_deepseek"
-model = "deepseek-ai/DeepSeek-R1-0528"
-base_url = "https://api-inference.huggingface.co/models"
+# OpenRouter configuration (explicit section)
+[llm.openrouter]
+api_type = "openai"
+model = "qwen/qwen3-32b:free"
+base_url = "https://openrouter.ai/api/v1"
 api_key = ""
 max_tokens = 4096
 temperature = 0.7
@@ -88,4 +87,3 @@ network_enabled = false
 # MCP configuration
 [mcp]
 server_reference = "app.mcp.server"
-
