@@ -1,27 +1,23 @@
-# Default LLM configuration (OpenRouter - Qwen3)
+# Default LLM configuration (OpenAI GPT-4o-mini)
 [llm]
 api_type = "openai"
-model = "qwen/qwen3-32b:free"
-base_url = "https://openrouter.ai/api/v1"
+model = "gpt-4o-mini"
+base_url = "https://api.openai.com/v1"
 api_key = ""
 max_tokens = 4096
 temperature = 0.7
 timeout = 120
 retry_count = 3
 streaming_supported = true
-http_referer = "https://mira-9ycj.onrender.com"
-x_title = "Mira AI Agent"
 
-# Vision model configuration using Qwen3
+# Vision model configuration using GPT-4o-mini
 [llm.vision]
 api_type = "openai"
-model = "qwen/qwen3-32b:free"
-base_url = "https://openrouter.ai/api/v1"
+model = "gpt-4o-mini"
+base_url = "https://api.openai.com/v1"
 api_key = ""
 max_tokens = 4096
 temperature = 0.7
-http_referer = "https://mira-9ycj.onrender.com"
-x_title = "Mira AI Agent"
 
 # OpenAI configuration (alternative provider)
 [llm.openai]
@@ -51,7 +47,7 @@ api_key = ""
 max_tokens = 4096
 temperature = 0.7
 
-# OpenRouter configuration (explicit section)
+# OpenRouter configuration (alternative provider)
 [llm.openrouter]
 api_type = "openai"
 model = "qwen/qwen3-32b:free"
@@ -61,6 +57,8 @@ max_tokens = 4096
 temperature = 0.7
 timeout = 120
 retry_count = 3
+http_referer = "https://mira-9ycj.onrender.com"
+x_title = "Mira AI Agent"
 
 # Browser configuration
 [browser]
