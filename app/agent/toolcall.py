@@ -32,7 +32,7 @@ class ToolCallAgent(ReActAgent):
 
     tool_calls: List[ToolCall] = Field(default_factory=list)
     _current_base64_image: Optional[str] = None
-    _consecutive_no_tool_steps: int = Field(default=0)
+    consecutive_no_tool_steps: int = Field(default=0)
 
     max_steps: int = 30
     max_observe: Optional[Union[int, bool]] = None
@@ -92,8 +92,8 @@ class ToolCallAgent(ReActAgent):
 
         # Auto-termination logic
         if not tool_calls:
-            self._consecutive_no_tool_steps += 1
-            if self._consecutive_no_tool_steps >= self.max_consecutive_no_tool_steps:
+            self.consecutive_no_tool_steps += 1
+            if self.consecutive_no_tool_steps >= self.max_consecutive_no_tool_steps:
                 logger.info("🏁 Auto-terminating: Maximum consecutive steps without tools reached")
                 self.state = AgentState.FINISHED
                 if content:
@@ -101,7 +101,7 @@ class ToolCallAgent(ReActAgent):
                 return False
         else:
             # Reset counter when tools are used
-            self._consecutive_no_tool_steps = 0
+            self.consecutive_no_tool_steps = 0
 
         try:
             if response is None:
