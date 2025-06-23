@@ -10,6 +10,7 @@ from app.logger import logger
 from app.prompt.toolcall import NEXT_STEP_PROMPT, SYSTEM_PROMPT
 from app.schema import TOOL_CHOICE_TYPE, AgentState, Message, ToolCall, ToolChoice
 from app.tool import CreateChatCompletion, Terminate, ToolCollection
+from app.sandbox.client import SANDBOX_CLIENT
 
 
 TOOL_CALL_REQUIRED = "Tool calls required but none provided"
@@ -32,6 +33,7 @@ class ToolCallAgent(ReActAgent):
 
     tool_calls: List[ToolCall] = Field(default_factory=list)
     _current_base64_image: Optional[str] = None
+    _stream_callback = None
     consecutive_no_tool_steps: int = Field(default=0)
 
     max_steps: int = 30
@@ -84,6 +86,11 @@ class ToolCallAgent(ReActAgent):
         logger.info(
             f"🛠️ {self.name} selected {len(tool_calls) if tool_calls else 0} tools to use"
         )
+
+        # Stream the AI thoughts if callback is available
+        if self._stream_callback and content:
+            await self._stream_callback(content)
+
         if tool_calls:
             logger.info(
                 f"🧰 Tools being prepared: {[call.function.name for call in tool_calls]}"
@@ -257,9 +264,64 @@ class ToolCallAgent(ReActAgent):
                     )
         logger.info(f"✨ Cleanup complete for agent '{self.name}'.")
 
-    async def run(self, request: Optional[str] = None) -> str:
-        """Run the agent with cleanup when done."""
+    async def run(self, request: Optional[str] = None, stream_callback=None, **kwargs) -> str:
+        """Run the agent with streaming support and cleanup when done."""
         try:
-            return await super().run(request)
+            # Store the stream callback for use during execution
+            self._stream_callback = stream_callback
+            
+            if self.state != AgentState.IDLE:
+                raise RuntimeError(f"Cannot run agent from state: {self.state}")
+
+            if request:
+                self.update_memory("user", request)
+
+            results: List[str] = []
+            async with self.state_context(AgentState.RUNNING):
+                while (
+                    self.current_step < self.max_steps and self.state != AgentState.FINISHED
+                ):
+                    self.current_step += 1
+                    logger.info(f"Executing step {self.current_step}/{self.max_steps}")
+                    
+                    # Stream step information if callback is available
+                    if self._stream_callback:
+                        await self._stream_callback(f"Step {self.current_step}: ")
+                    
+                    step_result = await self.step()
+
+                    # Check for stuck state
+                    if self.is_stuck():
+                        self.handle_stuck_state()
+
+                    results.append(f"Step {self.current_step}: {step_result}")
+                    
+                    # Stream the step result
+                    if self._stream_callback:
+                        await self._stream_callback(step_result)
+
+                    # Auto-terminate if agent state is marked as FINISHED
+                    if self.state == AgentState.FINISHED:
+                        logger.info("🏁 Agent marked as FINISHED, terminating execution")
+                        if self._stream_callback:
+                            await self._stream_callback("\n🏁 Task completed successfully!")
+                        break
+
+                if self.current_step >= self.max_steps and self.state != AgentState.FINISHED:
+                    self.current_step = 0
+                    self.state = AgentState.IDLE
+                    termination_msg = f"Terminated: Reached max steps ({self.max_steps})"
+                    results.append(termination_msg)
+                    if self._stream_callback:
+                        await self._stream_callback(f"\n⏰ {termination_msg}")
+                elif self.state == AgentState.FINISHED:
+                    self.current_step = 0
+                    self.state = AgentState.IDLE
+                    
+            await SANDBOX_CLIENT.cleanup()
+            return "\n".join(results) if results else "No steps executed"
+            
         finally:
             await self.cleanup()
+            # Clear the callback reference
+            self._stream_callback = None
