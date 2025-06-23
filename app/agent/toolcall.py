@@ -89,7 +89,7 @@ class ToolCallAgent(ReActAgent):
 
         # Stream the AI thoughts if callback is available
         if self._stream_callback and content:
-            await self._stream_callback(content)
+            self._stream_callback(content)
 
         if tool_calls:
             logger.info(
@@ -286,7 +286,7 @@ class ToolCallAgent(ReActAgent):
                     
                     # Stream step information if callback is available
                     if self._stream_callback:
-                        await self._stream_callback(f"Step {self.current_step}: ")
+                        self._stream_callback(f"Step {self.current_step}: ")
                     
                     step_result = await self.step()
 
@@ -298,13 +298,13 @@ class ToolCallAgent(ReActAgent):
                     
                     # Stream the step result
                     if self._stream_callback:
-                        await self._stream_callback(step_result)
+                        self._stream_callback(step_result)
 
                     # Auto-terminate if agent state is marked as FINISHED
                     if self.state == AgentState.FINISHED:
                         logger.info("🏁 Agent marked as FINISHED, terminating execution")
                         if self._stream_callback:
-                            await self._stream_callback("\n🏁 Task completed successfully!")
+                            self._stream_callback("\n🏁 Task completed successfully!")
                         break
 
                 if self.current_step >= self.max_steps and self.state != AgentState.FINISHED:
@@ -313,7 +313,7 @@ class ToolCallAgent(ReActAgent):
                     termination_msg = f"Terminated: Reached max steps ({self.max_steps})"
                     results.append(termination_msg)
                     if self._stream_callback:
-                        await self._stream_callback(f"\n⏰ {termination_msg}")
+                        self._stream_callback(f"\n⏰ {termination_msg}")
                 elif self.state == AgentState.FINISHED:
                     self.current_step = 0
                     self.state = AgentState.IDLE
