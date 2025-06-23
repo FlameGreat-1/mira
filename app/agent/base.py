@@ -146,10 +146,19 @@ class BaseAgent(BaseModel, ABC):
 
                 results.append(f"Step {self.current_step}: {step_result}")
 
-            if self.current_step >= self.max_steps:
+                # Auto-terminate if agent state is marked as FINISHED
+                if self.state == AgentState.FINISHED:
+                    logger.info("🏁 Agent marked as FINISHED, terminating execution")
+                    break
+
+            if self.current_step >= self.max_steps and self.state != AgentState.FINISHED:
                 self.current_step = 0
                 self.state = AgentState.IDLE
                 results.append(f"Terminated: Reached max steps ({self.max_steps})")
+            elif self.state == AgentState.FINISHED:
+                self.current_step = 0
+                self.state = AgentState.IDLE
+                
         await SANDBOX_CLIENT.cleanup()
         return "\n".join(results) if results else "No steps executed"
 

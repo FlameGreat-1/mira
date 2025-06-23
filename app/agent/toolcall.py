@@ -32,9 +32,11 @@ class ToolCallAgent(ReActAgent):
 
     tool_calls: List[ToolCall] = Field(default_factory=list)
     _current_base64_image: Optional[str] = None
+    _consecutive_no_tool_steps: int = Field(default=0)
 
     max_steps: int = 30
     max_observe: Optional[Union[int, bool]] = None
+    max_consecutive_no_tool_steps: int = Field(default=2)
 
     async def think(self) -> bool:
         """Process current state and decide next actions using tools"""
@@ -87,6 +89,19 @@ class ToolCallAgent(ReActAgent):
                 f"🧰 Tools being prepared: {[call.function.name for call in tool_calls]}"
             )
             logger.info(f"🔧 Tool arguments: {tool_calls[0].function.arguments}")
+
+        # Auto-termination logic
+        if not tool_calls:
+            self._consecutive_no_tool_steps += 1
+            if self._consecutive_no_tool_steps >= self.max_consecutive_no_tool_steps:
+                logger.info("🏁 Auto-terminating: Maximum consecutive steps without tools reached")
+                self.state = AgentState.FINISHED
+                if content:
+                    self.memory.add_message(Message.assistant_message(content))
+                return False
+        else:
+            # Reset counter when tools are used
+            self._consecutive_no_tool_steps = 0
 
         try:
             if response is None:
