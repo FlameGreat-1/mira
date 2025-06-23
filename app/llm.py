@@ -1,4 +1,5 @@
 import math
+import os
 from typing import Dict, List, Optional, Union
 
 import tiktoken
@@ -222,7 +223,10 @@ class LLM:
             elif self.api_type == "aws":
                 self.client = BedrockClient()
             else:
-                self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+                api_key = os.environ.get("OPENAI_API_KEY") or self.api_key
+                if not api_key:
+                    raise ValueError(f"API key not found for {self.base_url}")
+                self.client = AsyncOpenAI(api_key=api_key, base_url=self.base_url)
 
             self.token_counter = TokenCounter(self.tokenizer)
 
