@@ -89,7 +89,10 @@ class ToolCallAgent(ReActAgent):
 
         # Stream the AI thoughts if callback is available
         if self._stream_callback and content:
-            self._stream_callback(content)
+            try:
+                await self._stream_callback(content)
+            except Exception as e:
+                logger.warning(f"Stream callback error: {e}")
 
         if tool_calls:
             logger.info(
@@ -286,7 +289,10 @@ class ToolCallAgent(ReActAgent):
                     
                     # Stream step information if callback is available
                     if self._stream_callback:
-                        self._stream_callback(f"Step {self.current_step}: ")
+                        try:
+                            await self._stream_callback(f"Step {self.current_step}: ")
+                        except Exception as e:
+                            logger.warning(f"Stream callback error: {e}")
                     
                     step_result = await self.step()
 
@@ -298,13 +304,19 @@ class ToolCallAgent(ReActAgent):
                     
                     # Stream the step result
                     if self._stream_callback:
-                        self._stream_callback(step_result)
+                        try:
+                            await self._stream_callback(step_result)
+                        except Exception as e:
+                            logger.warning(f"Stream callback error: {e}")
 
                     # Auto-terminate if agent state is marked as FINISHED
                     if self.state == AgentState.FINISHED:
                         logger.info("🏁 Agent marked as FINISHED, terminating execution")
                         if self._stream_callback:
-                            self._stream_callback("\n🏁 Task completed successfully!")
+                            try:
+                                await self._stream_callback("\n🏁 Task completed successfully!")
+                            except Exception as e:
+                                logger.warning(f"Stream callback error: {e}")
                         break
 
                 if self.current_step >= self.max_steps and self.state != AgentState.FINISHED:
@@ -313,7 +325,10 @@ class ToolCallAgent(ReActAgent):
                     termination_msg = f"Terminated: Reached max steps ({self.max_steps})"
                     results.append(termination_msg)
                     if self._stream_callback:
-                        self._stream_callback(f"\n⏰ {termination_msg}")
+                        try:
+                            await self._stream_callback(f"\n⏰ {termination_msg}")
+                        except Exception as e:
+                            logger.warning(f"Stream callback error: {e}")
                 elif self.state == AgentState.FINISHED:
                     self.current_step = 0
                     self.state = AgentState.IDLE
