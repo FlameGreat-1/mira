@@ -81,7 +81,7 @@ class ToolCallAgent(ReActAgent):
             f"🛠️ {self.name} selected {len(tool_calls) if tool_calls else 0} tools to use"
         )
 
-        if self._stream_callback and content:
+        if self._stream_callback is not None and content:
             try:
                 await self._stream_callback(content)
             except Exception as e:
@@ -254,7 +254,7 @@ class ToolCallAgent(ReActAgent):
                     self.current_step += 1
                     logger.info(f"Executing step {self.current_step}/{self.max_steps}")
                     
-                    if self._stream_callback:
+                    if self._stream_callback is not None:
                         try:
                             await self._stream_callback(f"Step {self.current_step}: ")
                         except Exception as e:
@@ -267,7 +267,7 @@ class ToolCallAgent(ReActAgent):
 
                     results.append(f"Step {self.current_step}: {step_result}")
                     
-                    if self._stream_callback:
+                    if self._stream_callback is not None:
                         try:
                             await self._stream_callback(step_result)
                         except Exception as e:
@@ -275,7 +275,7 @@ class ToolCallAgent(ReActAgent):
 
                     if self.state == AgentState.FINISHED:
                         logger.info("🏁 Agent marked as FINISHED, terminating execution")
-                        if self._stream_callback:
+                        if self._stream_callback is not None:
                             try:
                                 await self._stream_callback("\n🏁 Task completed successfully!")
                             except Exception as e:
@@ -287,7 +287,7 @@ class ToolCallAgent(ReActAgent):
                     self.state = AgentState.IDLE
                     termination_msg = f"Terminated: Reached max steps ({self.max_steps})"
                     results.append(termination_msg)
-                    if self._stream_callback:
+                    if self._stream_callback is not None:
                         try:
                             await self._stream_callback(f"\n⏰ {termination_msg}")
                         except Exception as e:
@@ -300,5 +300,6 @@ class ToolCallAgent(ReActAgent):
             return "\n".join(results) if results else "No steps executed"
             
         finally:
-            await self.cleanup()
+            callback_to_clear = self._stream_callback
             self._stream_callback = None
+            await self.cleanup()
