@@ -17,8 +17,6 @@ TOOL_CALL_REQUIRED = "Tool calls required but none provided"
 
 
 class ToolCallAgent(ReActAgent):
-    """Base agent class for handling tool/function calls with enhanced abstraction"""
-
     name: str = "toolcall"
     description: str = "an agent that can execute tool calls."
 
@@ -28,7 +26,7 @@ class ToolCallAgent(ReActAgent):
     available_tools: ToolCollection = ToolCollection(
         CreateChatCompletion(), Terminate()
     )
-    tool_choices: TOOL_CHOICE_TYPE = ToolChoice.AUTO  # type: ignore
+    tool_choices: TOOL_CHOICE_TYPE = ToolChoice.AUTO
     special_tool_names: List[str] = Field(default_factory=lambda: [Terminate().name])
 
     tool_calls: List[ToolCall] = Field(default_factory=list)
@@ -41,13 +39,11 @@ class ToolCallAgent(ReActAgent):
     max_consecutive_no_tool_steps: int = Field(default=2)
 
     async def think(self) -> bool:
-        """Process current state and decide next actions using tools"""
         if self.next_step_prompt:
             user_msg = Message.user_message(self.next_step_prompt)
             self.messages += [user_msg]
 
         try:
-            # Get response with tool options
             response = await self.llm.ask_tool(
                 messages=self.messages,
                 system_msgs=(
@@ -61,7 +57,6 @@ class ToolCallAgent(ReActAgent):
         except ValueError:
             raise
         except Exception as e:
-            # Check if this is a RetryError containing TokenLimitExceeded
             if hasattr(e, "__cause__") and isinstance(e.__cause__, TokenLimitExceeded):
                 token_limit_error = e.__cause__
                 logger.error(
@@ -81,13 +76,11 @@ class ToolCallAgent(ReActAgent):
         )
         content = response.content if response and response.content else ""
 
-        # Log response info
         logger.info(f"✨ {self.name}'s thoughts: {content}")
         logger.info(
             f"🛠️ {self.name} selected {len(tool_calls) if tool_calls else 0} tools to use"
         )
 
-        # Stream the AI thoughts if callback is available
         if self._stream_callback and content:
             try:
                 await self._stream_callback(content)
@@ -100,7 +93,6 @@ class ToolCallAgent(ReActAgent):
             )
             logger.info(f"🔧 Tool arguments: {tool_calls[0].function.arguments}")
 
-        # Auto-termination logic
         if not tool_calls:
             self.consecutive_no_tool_steps += 1
             if self.consecutive_no_tool_steps >= self.max_consecutive_no_tool_steps:
@@ -110,14 +102,12 @@ class ToolCallAgent(ReActAgent):
                     self.memory.add_message(Message.assistant_message(content))
                 return False
         else:
-            # Reset counter when tools are used
             self.consecutive_no_tool_steps = 0
 
         try:
             if response is None:
                 raise RuntimeError("No response received from the LLM")
 
-            # Handle different tool_choices modes
             if self.tool_choices == ToolChoice.NONE:
                 if tool_calls:
                     logger.warning(
@@ -128,7 +118,6 @@ class ToolCallAgent(ReActAgent):
                     return True
                 return False
 
-            # Create and add assistant message
             assistant_msg = (
                 Message.from_tool_calls(content=content, tool_calls=self.tool_calls)
                 if self.tool_calls
@@ -137,9 +126,8 @@ class ToolCallAgent(ReActAgent):
             self.memory.add_message(assistant_msg)
 
             if self.tool_choices == ToolChoice.REQUIRED and not self.tool_calls:
-                return True  # Will be handled in act()
+                return True
 
-            # For 'auto' mode, continue with content if no commands but content exists
             if self.tool_choices == ToolChoice.AUTO and not self.tool_calls:
                 return bool(content)
 
@@ -154,19 +142,14 @@ class ToolCallAgent(ReActAgent):
             return False
 
     async def act(self) -> str:
-        """Execute tool calls and handle their results"""
         if not self.tool_calls:
             if self.tool_choices == ToolChoice.REQUIRED:
                 raise ValueError(TOOL_CALL_REQUIRED)
-
-            # Return last message content if no tool calls
             return self.messages[-1].content or "No content or commands to execute"
 
         results = []
         for command in self.tool_calls:
-            # Reset base64_image for each tool call
             self._current_base64_image = None
-
             result = await self.execute_tool(command)
 
             if self.max_observe:
@@ -176,7 +159,6 @@ class ToolCallAgent(ReActAgent):
                 f"🎯 Tool '{command.function.name}' completed its mission! Result: {result}"
             )
 
-            # Add tool response to memory
             tool_msg = Message.tool_message(
                 content=result,
                 tool_call_id=command.id,
@@ -189,7 +171,6 @@ class ToolCallAgent(ReActAgent):
         return "\n\n".join(results)
 
     async def execute_tool(self, command: ToolCall) -> str:
-        """Execute a single tool call with robust error handling"""
         if not command or not command.function or not command.function.name:
             return "Error: Invalid command format"
 
@@ -198,22 +179,15 @@ class ToolCallAgent(ReActAgent):
             return f"Error: Unknown tool '{name}'"
 
         try:
-            # Parse arguments
             args = json.loads(command.function.arguments or "{}")
-
-            # Execute the tool
             logger.info(f"🔧 Activating tool: '{name}'...")
             result = await self.available_tools.execute(name=name, tool_input=args)
 
-            # Handle special tools
             await self._handle_special_tool(name=name, result=result)
 
-            # Check if result is a ToolResult with base64_image
             if hasattr(result, "base64_image") and result.base64_image:
-                # Store the base64_image for later use in tool_message
                 self._current_base64_image = result.base64_image
 
-            # Format result for display (standard case)
             observation = (
                 f"Observed output of cmd `{name}` executed:\n{str(result)}"
                 if result
@@ -233,26 +207,21 @@ class ToolCallAgent(ReActAgent):
             return f"Error: {error_msg}"
 
     async def _handle_special_tool(self, name: str, result: Any, **kwargs):
-        """Handle special tool execution and state changes"""
         if not self._is_special_tool(name):
             return
 
         if self._should_finish_execution(name=name, result=result, **kwargs):
-            # Set agent state to finished
             logger.info(f"🏁 Special tool '{name}' has completed the task!")
             self.state = AgentState.FINISHED
 
     @staticmethod
     def _should_finish_execution(**kwargs) -> bool:
-        """Determine if tool execution should finish the agent"""
         return True
 
     def _is_special_tool(self, name: str) -> bool:
-        """Check if tool name is in special tools list"""
         return name.lower() in [n.lower() for n in self.special_tool_names]
 
     async def cleanup(self):
-        """Clean up resources used by the agent's tools."""
         logger.info(f"🧹 Cleaning up resources for agent '{self.name}'...")
         for tool_name, tool_instance in self.available_tools.tool_map.items():
             if hasattr(tool_instance, "cleanup") and asyncio.iscoroutinefunction(
@@ -268,9 +237,7 @@ class ToolCallAgent(ReActAgent):
         logger.info(f"✨ Cleanup complete for agent '{self.name}'.")
 
     async def run(self, request: Optional[str] = None, stream_callback=None, **kwargs) -> str:
-        """Run the agent with streaming support and cleanup when done."""
         try:
-            # Store the stream callback for use during execution
             self._stream_callback = stream_callback
             
             if self.state != AgentState.IDLE:
@@ -287,7 +254,6 @@ class ToolCallAgent(ReActAgent):
                     self.current_step += 1
                     logger.info(f"Executing step {self.current_step}/{self.max_steps}")
                     
-                    # Stream step information if callback is available
                     if self._stream_callback:
                         try:
                             await self._stream_callback(f"Step {self.current_step}: ")
@@ -296,20 +262,17 @@ class ToolCallAgent(ReActAgent):
                     
                     step_result = await self.step()
 
-                    # Check for stuck state
                     if self.is_stuck():
                         self.handle_stuck_state()
 
                     results.append(f"Step {self.current_step}: {step_result}")
                     
-                    # Stream the step result
                     if self._stream_callback:
                         try:
                             await self._stream_callback(step_result)
                         except Exception as e:
                             logger.warning(f"Stream callback error: {e}")
 
-                    # Auto-terminate if agent state is marked as FINISHED
                     if self.state == AgentState.FINISHED:
                         logger.info("🏁 Agent marked as FINISHED, terminating execution")
                         if self._stream_callback:
@@ -338,5 +301,4 @@ class ToolCallAgent(ReActAgent):
             
         finally:
             await self.cleanup()
-            # Clear the callback reference
             self._stream_callback = None
